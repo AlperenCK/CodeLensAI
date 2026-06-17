@@ -33,7 +33,7 @@
     <Nullable>enable</Nullable>
 
     <!-- Computed paths from Version.props -->
-    <NewtonsoftPackagePath>..\packages\newtonsoft.json\$(NewtonsoftJsonVersion)\lib\net45\Newtonsoft.Json.dll</NewtonsoftPackagePath>
+    <NewtonsoftPackagePath>..\packages\Newtonsoft.Json.$(NewtonsoftJsonVersion)\lib\net45\Newtonsoft.Json.dll</NewtonsoftPackagePath>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

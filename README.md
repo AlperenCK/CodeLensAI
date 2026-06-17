@@ -104,52 +104,49 @@ API Key      : sk-xxxx  (LiteLLM virtual key — sk- ile başlamalı)
 
 ## 📖 Kullanım
 
-### Yöntem 1 — Sağ Tık Menüsü (Önerilen)
+### Arayüz
+
+v1.6.0 ile birlikte CodeLens AI modern bir **sohbet baloncuğu arayüzüne** kavuştu:
+
+```
+┌─────────────────────────────────────────────┐
+│  ● CodeLens AI          qwen3-coder  ⚙  ↺  │
+├─────────────────────────────────────────────┤
+│                                             │
+│         ●                                  │
+│     CodeLens AI                            │
+│   Kodu seçin, sorunuzu yazın.              │
+│                                             │
+│  ┌──────────────────────────────────────┐  │
+│  │ public int Add(int a, int b) {       │  │  ← Kod önizleme
+│  │   return a - b; // bug               │  │
+│  └──────────────────────────────────────┘  │
+│                         Bu kodda hata var mı? │  ← Kullanıcı
+│                                             │
+│  ┌──────────────────────────────────────┐  │
+│  │ Evet — `a - b` yerine `a + b` olmalı │  │  ← AI yanıtı
+│  │                          [Kopyala]   │  │
+│  └──────────────────────────────────────┘  │
+│                                             │
+├─────────────────────────────────────────────┤
+│  Sorunuzu yazın… (Ctrl+Enter)     [↑]      │
+└─────────────────────────────────────────────┘
+```
+
+### Yöntem 1 — Sağ Tık (Önerilen)
 
 1. Editörde analiz etmek istediğiniz kodu **seçin**
 2. Sağ tıklayın → **CodeLens AI: Analyze Selection**
-3. **Selected Code** alanı otomatik dolar
-4. Sorunuzu **Your question** alanına yazın
-5. **▶ Analyze** butonuna basın veya `Ctrl+Enter`
-
-```
-┌─────────────────────────────────────────┐
-│  CodeLens AI                        🤖  │
-├─────────────────────────────────────────┤
-│  Selected Code                  [Clear] │
-│  ┌───────────────────────────────────┐  │
-│  │ public int Add(int a, int b) {    │  │
-│  │   return a - b; // bug here       │  │
-│  │ }                                 │  │
-│  └───────────────────────────────────┘  │
-│                                         │
-│  Your question or instruction           │
-│  ┌───────────────────────────────────┐  │
-│  │ Bu kodda hata var mı?             │  │
-│  └───────────────────────────────────┘  │
-│                                         │
-│  [▶ Analyze]  [✕ Cancel]  [📋 Copy]    │
-├─────────────────────────────────────────┤
-│  Response                               │
-│  ┌───────────────────────────────────┐  │
-│  │ Evet, `a - b` yerine `a + b`      │  │
-│  │ olmalı. Return satırını           │  │
-│  │ `return a + b;` olarak düzeltin.  │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-```
+3. Kod önizleme balonu otomatik dolar
+4. Sorunuzu yazın → `Ctrl+Enter` veya `↑`
 
 ### Yöntem 2 — Tools Menüsü
 
 **Tools → Analyze with CodeLens AI**
 
-Seçili kod otomatik panele aktarılır.
-
 ### Yöntem 3 — Manuel
 
-1. **Tools → Analyze with CodeLens AI** ile paneli açın
-2. Kodu **Selected Code** alanına yapıştırın
-3. Sorunuzu yazın ve analiz edin
+Paneli açın, sorunuzu doğrudan yazın (kod olmadan da kullanabilirsiniz).
 
 ---
 
@@ -176,7 +173,7 @@ CodeLensAI/
 │   └── AnalyzeCommand.cs           # Editör komutu — seçili metni alır
 ├── ToolWindows/
 │   ├── ChatWindow.cs               # ToolWindowPane wrapper
-│   ├── ChatWindowControl.xaml      # WPF arayüzü
+│   ├── ChatWindowControl.xaml      # WPF sohbet arayüzü (v1.6.0)
 │   └── ChatWindowControl.xaml.cs  # UI logic + async LLM çağrısı
 ├── Options/
 │   └── LlmOptions.cs               # VS Settings Store kalıcı ayarlar
@@ -202,6 +199,19 @@ msbuild CodeLensAI\CodeLensAI.csproj /p:Configuration=Release /v:minimal
 **Gereksinimler:**
 - Visual Studio 2022 (Visual Studio extension development workload)
 - NuGet CLI
+
+---
+
+## 📋 Sürüm Geçmişi
+
+| Versiyon | Değişiklik |
+|---|---|
+| v1.6.0 | Sohbet baloncuğu UI redesign — konuşma geçmişi, kod önizleme, model pill |
+| v1.5.0 | Yeni logo tasarımı |
+| v1.4.0 | CI/CD pipeline stabil, VSIX artifact otomatik release |
+| v1.2.0 | VSIX build düzeltildi (non-SDK csproj, VS 2022 Pro/Ent/Com) |
+| v1.1.0 | Constructor injection, WPF compat, unit test altyapısı |
+| v1.0.0 | İlk sürüm |
 
 ---
 

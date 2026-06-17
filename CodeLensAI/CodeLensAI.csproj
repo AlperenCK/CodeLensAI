@@ -5,6 +5,16 @@
     <TargetFramework>net472</TargetFramework>
     <RootNamespace>CodeLensAI</RootNamespace>
     <AssemblyName>CodeLensAI</AssemblyName>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <Version>1.1.0</Version>
+    <Authors>CodeLensAI Team</Authors>
+    <Description>Local LLM Code Analysis Extension for Visual Studio 2022</Description>
+    <PackageProjectUrl>https://github.com/AlperenCK/CodeLensAI</PackageProjectUrl>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <_SkipUpgradeNetAnalyzersNuGetWarning>true</_SkipUpgradeNetAnalyzersNuGetWarning>
+
+    <!-- VSIX packaging properties -->
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
     <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
@@ -12,33 +22,27 @@
     <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
     <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
     <UseCodebase>true</UseCodebase>
-    <LangVersion>9.0</LangVersion>
-    <Nullable>enable</Nullable>
-    <Version>1.1.0</Version>
-    <Authors>CodeLensAI Team</Authors>
-    <Description>Local LLM Code Analysis Extension for Visual Studio 2022</Description>
-    <PackageProjectUrl>https://github.com/AlperenCK/CodeLensAI</PackageProjectUrl>
-    <!-- Disable SDK auto-generated AssemblyInfo — we supply Properties\AssemblyInfo.cs -->
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <!-- Suppress NetAnalyzers version mismatch warning -->
-    <_SkipUpgradeNetAnalyzersNuGetWarning>true</_SkipUpgradeNetAnalyzersNuGetWarning>
+
+    <!-- Do NOT set DeployExtension here — pass it on the command line if needed.
+         Setting it true installs to the experimental VS hive.
+         Setting it false still needs to be combined with CreateVsixContainer. -->
+    <DeployExtension>false</DeployExtension>
+
+    <!-- This is the key: tell VSSDK to create the .vsix file -->
+    <CreateVsixContainer>true</CreateVsixContainer>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- VS SDK -->
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.31902.203" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.0.5232" PrivateAssets="all" />
-    <!-- JSON serialization -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- XAML page — must be explicit so SDK compiles it as Page not Content -->
     <Page Include="ToolWindows\ChatWindowControl.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <!-- Code-behind is auto-linked via DependentUpon -->
     <Compile Update="ToolWindows\ChatWindowControl.xaml.cs">
       <DependentUpon>ChatWindowControl.xaml</DependentUpon>
     </Compile>

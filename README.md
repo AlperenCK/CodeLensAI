@@ -1,123 +1,219 @@
-# 🤖 CodeLens AI
+<div align="center">
 
-> **Local LLM Code Analysis Extension for Visual Studio 2022**
+<img src="https://raw.githubusercontent.com/AlperenCK/CodeLensAI/main/CodeLensAI/Resources/icon.png" width="80" height="80" alt="CodeLens AI Logo"/>
 
-[![Build Status](https://github.com/your-org/CodeLensAI/actions/workflows/build.yml/badge.svg)](https://github.com/your-org/CodeLensAI/actions)
-[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-CodeLens%20AI-blue)](https://marketplace.visualstudio.com/)
+# CodeLens AI
+
+**Visual Studio 2022 için Yerel LLM Kod Asistanı**
+
+Kodunuzu buluta göndermeden, kendi LLM'inizle analiz edin.
+
+[![Build](https://github.com/AlperenCK/CodeLensAI/actions/workflows/build.yml/badge.svg)](https://github.com/AlperenCK/CodeLensAI/actions)
+[![Release](https://img.shields.io/github/v/release/AlperenCK/CodeLensAI)](https://github.com/AlperenCK/CodeLensAI/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt)
+[![VS 2022](https://img.shields.io/badge/Visual%20Studio-2022-purple)](https://visualstudio.microsoft.com/)
 
-Connect Visual Studio 2022 to your **local LLM** (Ollama, LM Studio, llama.cpp, or any OpenAI-compatible API), select code, describe your problem, and get instant AI-powered analysis — without leaving the IDE and **without sending your code to the cloud**.
+</div>
 
 ---
 
-## ✨ Features
+## ✨ Ne Yapar?
 
-| Feature | Description |
+Visual Studio 2022'ye entegre olan CodeLens AI, editördeki seçili kodu alıp yerel LLM'inize göndererek anında analiz, hata tespiti, refactoring önerileri ve açıklama üretir — **internet bağlantısı ve bulut servisi gerekmez.**
+
+```
+Kodu seç  →  Soruyu yaz  →  Analiz Et  →  Yanıtı al
+```
+
+---
+
+## 🚀 Kurulum
+
+### Gereksinimler
+
+| Gereksinim | Versiyon |
 |---|---|
-| 🔌 **Local LLM Support** | Works with Ollama, LM Studio, or any OpenAI-compatible endpoint |
-| 📝 **Editor Integration** | Select code → right-click → "Analyze with CodeLens AI" |
-| 💬 **Chat Panel** | Dedicated tool window with code + question inputs |
-| ⚙️ **Persistent Settings** | Endpoint URL, model name, API key saved to VS Settings Store |
-| 🔒 **Privacy First** | Your code never leaves your machine |
-| ⚡ **Fast** | Non-blocking async calls; cancel any time |
+| Visual Studio | 2022 (v17.0+) Community / Professional / Enterprise |
+| Workload | Visual Studio extension development |
+| .NET Framework | 4.7.2+ |
+| LLM Sunucu | Ollama, LM Studio veya OpenAI-uyumlu herhangi bir API |
+
+### Adımlar
+
+1. [Releases](https://github.com/AlperenCK/CodeLensAI/releases/latest) sayfasından `CodeLensAI.vsix` dosyasını indirin
+2. Visual Studio'yu **kapatın**
+3. `CodeLensAI.vsix` dosyasına çift tıklayın ve yükleyin
+4. Visual Studio'yu tekrar açın
 
 ---
 
-## 🚀 Getting Started
+## ⚙️ Yapılandırma
 
-### Prerequisites
+**Tools → Options → CodeLens AI → LLM Connection**
 
-- Visual Studio 2022 (v17.0 or higher)
-- .NET Framework 4.7.2+
-- A running local LLM server:
-  - [Ollama](https://ollama.ai) — `ollama serve` (default: `http://localhost:11434`)
-  - [LM Studio](https://lmstudio.ai) — Enable local server (default: `http://localhost:1234`)
-  - Any OpenAI-compatible API
+| Alan | Açıklama | Örnek |
+|---|---|---|
+| Endpoint URL | LLM sunucunuzun base URL'i (`/chat/completions` **eklemeyin**) | `http://localhost:11434/v1` |
+| Model Name | Kullanmak istediğiniz model adı | `codellama`, `qwen2.5-coder:7b` |
+| API Key | Varsa API anahtarı, yoksa boş bırakın | `sk-xxxx` veya boş |
+| Max Tokens | Maksimum token sayısı | `2048` |
+| Temperature | Yanıt yaratıcılığı (0.0–1.0, kod için düşük önerilir) | `0.2` |
+| Timeout | HTTP istek zaman aşımı (saniye) | `60` |
 
-### Installation
+### Popüler LLM Yapılandırmaları
 
-1. Download `CodeLensAI.vsix` from [Releases](https://github.com/your-org/CodeLensAI/releases)
-2. Close Visual Studio
-3. Double-click the `.vsix` file and follow the installer
-4. Reopen Visual Studio 2022
+<details>
+<summary><b>🦙 Ollama</b></summary>
 
-### Configuration
+```
+Endpoint URL : http://localhost:11434/v1
+Model Name   : codellama          (veya: llama3, deepseek-coder, qwen2.5-coder:7b)
+API Key      : (boş)
+```
 
-1. Go to **Tools → Options → CodeLens AI → LLM Connection**
-2. Set your **Endpoint URL** (e.g. `http://localhost:11434/v1`)
-3. Set your **Model Name** (e.g. `codellama`, `deepseek-coder:6.7b`)
-4. Click **OK**
+Ollama'da model yüklemek için:
+```bash
+ollama pull codellama
+ollama pull qwen2.5-coder:7b
+```
+</details>
 
-### Usage
+<details>
+<summary><b>🎬 LM Studio</b></summary>
 
-1. **Open any code file** in Visual Studio
-2. **Select the code** you want to analyze
-3. Go to **Tools → Analyze with CodeLens AI** (or use the editor context menu)
-4. The **CodeLens AI** panel opens with your selected code pre-filled
-5. **Type your question** (e.g. "What does this do?", "Fix the bug", "Add unit tests")
-6. Press **▶ Analyze** or `Ctrl+Enter`
+```
+Endpoint URL : http://localhost:1234/v1
+Model Name   : (LM Studio'da yüklü modelin adı)
+API Key      : (boş)
+```
+
+LM Studio'da: **Local Server** sekmesine geçip sunucuyu başlatın.
+</details>
+
+<details>
+<summary><b>🔗 LiteLLM / Proxy</b></summary>
+
+```
+Endpoint URL : https://your-litellm-server/v1
+Model Name   : Qwen3-Coder-30B-A3B-Instruct  (veya proxy'deki model adı)
+API Key      : sk-xxxx  (LiteLLM virtual key — sk- ile başlamalı)
+```
+</details>
 
 ---
 
-## 🏗️ Architecture
+## 📖 Kullanım
+
+### Yöntem 1 — Sağ Tık Menüsü (Önerilen)
+
+1. Editörde analiz etmek istediğiniz kodu **seçin**
+2. Sağ tıklayın → **CodeLens AI: Analyze Selection**
+3. **Selected Code** alanı otomatik dolar
+4. Sorunuzu **Your question** alanına yazın
+5. **▶ Analyze** butonuna basın veya `Ctrl+Enter`
+
+```
+┌─────────────────────────────────────────┐
+│  CodeLens AI                        🤖  │
+├─────────────────────────────────────────┤
+│  Selected Code                  [Clear] │
+│  ┌───────────────────────────────────┐  │
+│  │ public int Add(int a, int b) {    │  │
+│  │   return a - b; // bug here       │  │
+│  │ }                                 │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+│  Your question or instruction           │
+│  ┌───────────────────────────────────┐  │
+│  │ Bu kodda hata var mı?             │  │
+│  └───────────────────────────────────┘  │
+│                                         │
+│  [▶ Analyze]  [✕ Cancel]  [📋 Copy]    │
+├─────────────────────────────────────────┤
+│  Response                               │
+│  ┌───────────────────────────────────┐  │
+│  │ Evet, `a - b` yerine `a + b`      │  │
+│  │ olmalı. Return satırını           │  │
+│  │ `return a + b;` olarak düzeltin.  │  │
+│  └───────────────────────────────────┘  │
+└─────────────────────────────────────────┘
+```
+
+### Yöntem 2 — Tools Menüsü
+
+**Tools → Analyze with CodeLens AI**
+
+Seçili kod otomatik panele aktarılır.
+
+### Yöntem 3 — Manuel
+
+1. **Tools → Analyze with CodeLens AI** ile paneli açın
+2. Kodu **Selected Code** alanına yapıştırın
+3. Sorunuzu yazın ve analiz edin
+
+---
+
+## 💡 Örnek Kullanım Senaryoları
+
+| Senaryo | Soru Örneği |
+|---|---|
+| Hata tespiti | `Bu kodda bug var mı?` |
+| Kod açıklama | `Bu metod ne yapıyor, satır satır açıkla` |
+| Refactoring | `Bu kodu daha okunabilir hale getir` |
+| Unit test | `Bu metod için xUnit test yaz` |
+| Performans | `Bu sorguyu nasıl optimize ederim?` |
+| Güvenlik | `Bu kodda güvenlik açığı var mı?` |
+| Çeviri | `Bu kodu C#'dan Python'a çevir` |
+
+---
+
+## 🏗️ Mimari
 
 ```
 CodeLensAI/
-├── VSPackage.cs                  # AsyncPackage entry point
+├── VSPackage.cs                    # AsyncPackage giriş noktası
 ├── Commands/
-│   └── AnalyzeCommand.cs         # Editor command (grabs selected text)
+│   └── AnalyzeCommand.cs           # Editör komutu — seçili metni alır
 ├── ToolWindows/
-│   ├── ChatWindow.cs             # ToolWindowPane host
-│   ├── ChatWindowControl.xaml    # WPF UI
-│   └── ChatWindowControl.xaml.cs # UI logic + LLM call orchestration
+│   ├── ChatWindow.cs               # ToolWindowPane wrapper
+│   ├── ChatWindowControl.xaml      # WPF arayüzü
+│   └── ChatWindowControl.xaml.cs  # UI logic + async LLM çağrısı
 ├── Options/
-│   └── LlmOptions.cs             # DialogPage (VS Settings Store)
+│   └── LlmOptions.cs               # VS Settings Store kalıcı ayarlar
 ├── Services/
-│   └── LlmService.cs             # HttpClient → OpenAI-compat /v1/chat/completions
+│   ├── ILlmHost.cs                 # Arayüz (test edilebilirlik)
+│   └── LlmService.cs               # HTTP istemcisi → /v1/chat/completions
 └── Models/
-    └── ChatMessage.cs            # Request/response models (Newtonsoft.Json)
+    └── ChatMessage.cs              # Request/response modelleri
 ```
-
-### Supported LLM Models (tested)
-
-| Model | Provider | Recommended for |
-|---|---|---|
-| `codellama` | Ollama | General code analysis |
-| `deepseek-coder:6.7b` | Ollama | Code generation & fixes |
-| `qwen2.5-coder:7b` | Ollama | Multi-language support |
-| `mistral` | Ollama | Explanations & docs |
-| Any OpenAI-compat model | LM Studio | Flexible |
 
 ---
 
-## 🔧 Building from Source
+## 🔧 Kaynaktan Derleme
 
-```bash
-git clone https://github.com/your-org/CodeLensAI.git
+```powershell
+git clone https://github.com/AlperenCK/CodeLensAI.git
 cd CodeLensAI
-nuget restore CodeLensAI.sln
-msbuild CodeLensAI.sln /p:Configuration=Release
-# VSIX output: CodeLensAI/bin/Release/CodeLensAI.vsix
+nuget restore -PackagesDirectory ".\packages\" CodeLensAI.sln
+msbuild CodeLensAI\CodeLensAI.csproj /p:Configuration=Release /v:minimal
+# Çıktı: CodeLensAI\bin\Release\CodeLensAI.vsix
 ```
 
-### CI/CD
-
-Push to `main` → GitHub Actions builds, runs Roslyn code quality analysis, and uploads the VSIX artifact.
-Tag `v*.*.*` → additionally creates a GitHub Release with the VSIX attached.
-
----
-
-## 🤝 Contributing
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Commit with a descriptive message
-4. Push and open a Pull Request
-
-All PRs go through the automated build + Roslyn analysis gate.
+**Gereksinimler:**
+- Visual Studio 2022 (Visual Studio extension development workload)
+- NuGet CLI
 
 ---
 
-## 📜 License
+## 🤝 Katkı
+
+1. Fork'layın
+2. Feature branch oluşturun (`git checkout -b feature/yeni-ozellik`)
+3. Commit'leyin
+4. PR açın
+
+---
+
+## 📜 Lisans
 
 MIT © 2026 CodeLensAI Team

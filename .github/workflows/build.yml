@@ -1,0 +1,191 @@
+name: Build, Analyze & Release CodeLens AI
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  SOLUTION_PATH: CodeLensAI.sln
+  PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
+  VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # Job 1 — Build + Code Quality
+  # ────────────────────────────────────────────────────────────
+  build:
+    name: Build & Analyze (VS 2022)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Full history for versioning
+
+      - name: Setup MSBuild (VS 2022)
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,18.0)'
+          msbuild-architecture: x64
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+        with:
+          nuget-version: '6.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-
+
+      - name: Restore NuGet packages
+        run: nuget restore ${{ env.SOLUTION_PATH }}
+
+      # ── Debug build (fast feedback) ──
+      - name: Build (Debug)
+        run: |
+          msbuild ${{ env.SOLUTION_PATH }} `
+            /p:Configuration=Debug `
+            /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=true `
+            /m `
+            /v:minimal
+
+      # ── Release build for the VSIX artifact ──
+      - name: Build (Release)
+        run: |
+          msbuild ${{ env.SOLUTION_PATH }} `
+            /p:Configuration=Release `
+            /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=true `
+            /m `
+            /v:minimal
+
+      # ── Verify VSIX was produced ──
+      - name: Verify VSIX artifact exists
+        shell: pwsh
+        run: |
+          $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
+          if ($vsix.Count -eq 0) {
+            Write-Error "No .vsix file found in ${{ env.VSIX_OUTPUT_DIR }}"
+            exit 1
+          }
+          Write-Host "✓ VSIX found: $($vsix[0].FullName) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
+
+      # ── Roslyn / .editorconfig code quality report ──
+      - name: Run Roslyn analyzers (code quality gate)
+        run: |
+          msbuild ${{ env.PROJECT_PATH }} `
+            /p:Configuration=Release `
+            /p:RunAnalyzersDuringBuild=true `
+            /p:EnforceCodeStyleInBuild=true `
+            /p:TreatWarningsAsErrors=true `
+            /t:Rebuild `
+            /m `
+            /v:normal `
+            2>&1 | Tee-Object -FilePath analysis-report.txt
+
+      - name: Upload analysis report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-quality-report
+          path: analysis-report.txt
+          retention-days: 30
+
+      # ── Upload VSIX artifact (all builds) ──
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodeLensAI-vsix-${{ github.sha }}
+          path: ${{ env.VSIX_OUTPUT_DIR }}/*.vsix
+          retention-days: 90
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────
+  # Job 2 — GitHub Release (tags only)
+  # ────────────────────────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-2022
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,18.0)'
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+        with:
+          nuget-version: '6.x'
+
+      - name: Restore NuGet packages
+        run: nuget restore ${{ env.SOLUTION_PATH }}
+
+      - name: Build Release VSIX
+        run: |
+          msbuild ${{ env.SOLUTION_PATH }} `
+            /p:Configuration=Release `
+            /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=true `
+            /m
+
+      - name: Find VSIX file
+        id: find_vsix
+        shell: pwsh
+        run: |
+          $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse | Select-Object -First 1
+          echo "VSIX_PATH=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
+          echo "VSIX_NAME=$($vsix.Name)" >> $env:GITHUB_OUTPUT
+
+      - name: Extract release notes from tag
+        id: tag_message
+        shell: pwsh
+        run: |
+          $msg = git tag -l --format='%(contents)' ${{ github.ref_name }}
+          if (-not $msg) { $msg = "Release ${{ github.ref_name }}" }
+          echo "RELEASE_NOTES=$msg" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release with VSIX
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "CodeLens AI ${{ github.ref_name }}"
+          body: |
+            ## CodeLens AI ${{ github.ref_name }}
+
+            ### Installation
+            1. Download `CodeLensAI.vsix` below
+            2. Double-click to install (Visual Studio must be closed)
+            3. Reopen VS 2022 → Tools → Options → **CodeLens AI** to configure your LLM endpoint
+
+            ### What's New
+            ${{ steps.tag_message.outputs.RELEASE_NOTES }}
+
+            ### Requirements
+            - Visual Studio 2022 (version 17.0 or higher)
+            - .NET Framework 4.7.2+
+            - Local LLM server (Ollama, LM Studio, or any OpenAI-compatible API)
+          files: ${{ steps.find_vsix.outputs.VSIX_PATH }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true

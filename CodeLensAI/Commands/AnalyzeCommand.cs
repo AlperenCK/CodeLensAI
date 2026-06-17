@@ -9,11 +9,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace CodeLensAI.Commands
 {
-    /// <summary>
-    /// "Analyze with CodeLens AI" command.
-    /// Opens the <see cref="ChatWindow"/>, injects the <see cref="ILlmHost"/>,
-    /// and pre-fills the code box with the current editor selection.
-    /// </summary>
     internal sealed class AnalyzeCommand
     {
         public static readonly Guid CommandSet =
@@ -27,14 +22,13 @@ namespace CodeLensAI.Commands
         private AnalyzeCommand(AsyncPackage package, ILlmHost host, OleMenuCommandService commandService)
         {
             _package = package ?? throw new ArgumentNullException(nameof(package));
-            _host = host ?? throw new ArgumentNullException(nameof(host));
+            _host    = host    ?? throw new ArgumentNullException(nameof(host));
 
             var menuCommandId = new CommandID(CommandSet, CommandId);
             var menuItem = new OleMenuCommand(Execute, menuCommandId);
             commandService.AddCommand(menuItem);
         }
 
-        /// <summary>Registers the command. Called from VSPackage.InitializeAsync.</summary>
         public static async Task InitializeAsync(AsyncPackage package)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
@@ -43,9 +37,7 @@ namespace CodeLensAI.Commands
                 as OleMenuCommandService
                 ?? throw new InvalidOperationException("Could not obtain IMenuCommandService.");
 
-            // Package implements ILlmHost
             var host = (ILlmHost)package;
-
             _ = new AnalyzeCommand(package, host, commandService);
         }
 
@@ -97,13 +89,11 @@ namespace CodeLensAI.Commands
                 cancellationToken: _package.DisposalToken) as ChatWindow;
 
             if (window?.Frame == null)
-                throw new InvalidOperationException(
-                    "Could not create or show the CodeLens AI Chat window.");
+                throw new InvalidOperationException("Could not create or show the CodeLens AI Chat window.");
 
             var windowFrame = (IVsWindowFrame)window.Frame;
             Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(windowFrame.Show());
 
-            // Inject host + pre-fill code — no global service lookup
             window.SetHost(_host);
 
             if (window.Content is ChatWindowControl control)

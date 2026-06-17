@@ -56,6 +56,9 @@
       <SubType>Designer</SubType>
     </Content>
     <Content Include="Resources\*.png" />
+    <Content Include="..\LICENSE.txt">
+      <Link>LICENSE.txt</Link>
+    </Content>
   </ItemGroup>
 
 </Project>

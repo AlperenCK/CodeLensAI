@@ -25,8 +25,8 @@ namespace CodeLensAI.Services
             "Respond in the same language the user writes in. " +
             "Format code blocks with appropriate markdown fences.";
 
-        private HttpClient _httpClient;
-        private LlmOptions _options;
+        private HttpClient _httpClient = null!;  // assigned in ctor
+        private LlmOptions _options = null!;   // assigned in ctor
         private bool _disposed;
 
         public LlmService(LlmOptions options)

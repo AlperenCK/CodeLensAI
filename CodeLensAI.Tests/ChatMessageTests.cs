@@ -2,6 +2,9 @@ using CodeLensAI.Models;
 using Newtonsoft.Json;
 using Xunit;
 
+#nullable disable  // Test files — nullable strictness not required
+
+
 namespace CodeLensAI.Tests
 {
     /// <summary>Unit tests for <see cref="ChatMessage"/> and related models.</summary>

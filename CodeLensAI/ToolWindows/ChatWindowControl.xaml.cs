@@ -6,14 +6,13 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using CodeLensAI.Services;
-#nullable disable
 
 namespace CodeLensAI.ToolWindows
 {
     public partial class ChatWindowControl : UserControl
     {
-        private ILlmHost? _host;
-        private CancellationTokenSource? _cts;
+        private ILlmHost _host = null!;
+        private CancellationTokenSource _cts = null!;
         private string _selectedCode = string.Empty;
 
         public ChatWindowControl()
@@ -101,7 +100,7 @@ namespace CodeLensAI.ToolWindows
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
-            _cts?.Cancel();
+            if (_cts != null) _cts.Cancel();
         }
 
         // ── Core send ─────────────────────────────────────────────────────
@@ -163,8 +162,8 @@ namespace CodeLensAI.ToolWindows
             finally
             {
                 SetBusy(false);
-                _cts?.Dispose();
-                _cts = null;
+                if (_cts != null) _cts.Dispose();
+                _cts = null!;
             }
         }
 

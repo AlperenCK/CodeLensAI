@@ -12,6 +12,9 @@ using Moq.Protected;
 using Newtonsoft.Json;
 using Xunit;
 
+#nullable disable  // Test files — nullable strictness not required
+
+
 namespace CodeLensAI.Tests
 {
     /// <summary>

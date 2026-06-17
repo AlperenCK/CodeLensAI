@@ -12,7 +12,6 @@ on:
 env:
   SOLUTION_PATH: CodeLensAI.sln
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
-  TEST_PROJECT_PATH: CodeLensAI.Tests/CodeLensAI.Tests.csproj
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -49,46 +48,51 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore ${{ env.SOLUTION_PATH }}
 
-      - name: Show all warnings (no warnaserror - diagnostics)
-        shell: pwsh
-        run: |
-          Write-Host "### DIAGNOSTIC BUILD - showing all CS warnings ###"
-          $output = msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Debug `
-            /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=false `
-            /m /v:normal 2>&1
-          $output | Where-Object { $_ -match "warning CS|error CS|warning MSB|error MSB|Build FAILED|Build succeeded" } |
-            ForEach-Object { Write-Host $_ }
-          Write-Host "### END DIAGNOSTIC ###"
-
-      - name: Build Debug (strict)
+      - name: Build Debug
         shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
-            /m /v:normal 2>&1 | ForEach-Object {
-              if ($_ -match "error CS|error MSB|warning CS|warning MSB|Build FAILED") {
-                Write-Host "##[error]$_"
-              } else {
-                Write-Host $_
-              }
-            }
+            /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run unit tests
         shell: pwsh
         run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vstest  = & $vswhere -latest -products * -find "**\vstest.console.exe" 2>$null |
-                       Select-Object -First 1
-          Write-Host "vstest: $vstest"
+          Write-Host "=== Locating vstest.console.exe ==="
+          # Known path on windows-2022 runner for VS 2022 Enterprise
+          $knownPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe"
+          
+          if (Test-Path $knownPath) {
+            $vstest = $knownPath
+          } else {
+            # Fallback: vswhere
+            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+            if (Test-Path $vswhere) {
+              $vstest = & $vswhere -latest -products * -find "**\vstest.console.exe" 2>$null | Select-Object -First 1
+            }
+          }
+
+          Write-Host "vstest path: $vstest"
+          if (-not $vstest -or -not (Test-Path $vstest)) {
+            Write-Host "vstest not found at expected paths. Listing available:"
+            Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022" -Filter "vstest.console.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+            Write-Error "vstest.console.exe not found"
+            exit 1
+          }
+
           $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
-          if (-not $testDll) { Write-Error "DLL not found"; exit 1 }
-          & $vstest $testDll.FullName --logger:"trx;LogFileName=TestResults.trx" --logger:"console;verbosity=detailed"
+          Write-Host "Test DLL: $($testDll.FullName)"
+
+          & $vstest $testDll.FullName `
+            --logger:"trx;LogFileName=TestResults.trx" `
+            --logger:"console;verbosity=detailed"
+
+          Write-Host "vstest exit code: $LASTEXITCODE"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "All tests passed"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -124,6 +128,7 @@ jobs:
             /p:TreatWarningsAsErrors=true `
             /t:Rebuild /m /v:normal `
             2>&1 | Tee-Object -FilePath analysis-report.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload analysis report
         uses: actions/upload-artifact@v4

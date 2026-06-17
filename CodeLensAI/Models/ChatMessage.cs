@@ -1,15 +1,15 @@
 using System.Collections.Generic;
-using Newtonsoft.Json;
+using System.Runtime.Serialization;
 
 namespace CodeLensAI.Models
 {
-    /// <summary>Single chat message in the OpenAI-compatible format.</summary>
+    [DataContract]
     public sealed class ChatMessage
     {
-        [JsonProperty("role")]
+        [DataMember(Name = "role")]
         public string Role { get; set; } = "user";
 
-        [JsonProperty("content")]
+        [DataMember(Name = "content")]
         public string Content { get; set; } = string.Empty;
 
         public static ChatMessage System(string content) =>
@@ -22,45 +22,45 @@ namespace CodeLensAI.Models
             new ChatMessage { Role = "assistant", Content = content };
     }
 
-    /// <summary>Request body for /v1/chat/completions.</summary>
+    [DataContract]
     public sealed class ChatCompletionRequest
     {
-        [JsonProperty("model")]
+        [DataMember(Name = "model")]
         public string Model { get; set; } = string.Empty;
 
-        [JsonProperty("messages")]
+        [DataMember(Name = "messages")]
         public List<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
 
-        [JsonProperty("max_tokens")]
+        [DataMember(Name = "max_tokens")]
         public int MaxTokens { get; set; } = 2048;
 
-        [JsonProperty("temperature")]
+        [DataMember(Name = "temperature")]
         public double Temperature { get; set; } = 0.2;
 
-        [JsonProperty("stream")]
+        [DataMember(Name = "stream")]
         public bool Stream { get; set; } = false;
     }
 
-    /// <summary>Minimal response deserialization — we only need the content text.</summary>
+    [DataContract]
     public sealed class ChatCompletionResponse
     {
-        [JsonProperty("choices")]
+        [DataMember(Name = "choices")]
         public List<Choice> Choices { get; set; } = new List<Choice>();
 
         public string? GetContent() =>
             Choices.Count > 0 ? Choices[0].Message?.Content : null;
     }
 
+    [DataContract]
     public sealed class Choice
     {
-        [JsonProperty("message")]
+        [DataMember(Name = "message")]
         public ChatMessage? Message { get; set; }
 
-        [JsonProperty("finish_reason")]
+        [DataMember(Name = "finish_reason")]
         public string? FinishReason { get; set; }
     }
 
-    /// <summary>Result returned to the UI layer.</summary>
     public sealed class LlmResult
     {
         public bool Success { get; private set; }

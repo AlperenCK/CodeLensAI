@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+// Bu dosya GenerateAssemblyInfo=false ile birlikte çalışır.
+// SDK'nın auto-generate ettiği attribute'lar buraya taşındı.
 [assembly: AssemblyTitle("CodeLensAI")]
 [assembly: AssemblyDescription("Local LLM Code Analysis Extension for Visual Studio 2022")]
 [assembly: AssemblyConfiguration("")]
@@ -10,5 +12,5 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]

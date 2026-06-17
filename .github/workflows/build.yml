@@ -15,6 +15,7 @@ env:
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  CACHE_BUST: "v3"
 
 jobs:
   build:
@@ -42,8 +43,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-
+          key: ${{ env.CACHE_BUST }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: ${{ env.CACHE_BUST }}-nuget-
 
       - name: Restore NuGet packages
         run: nuget restore ${{ env.SOLUTION_PATH }}
@@ -51,48 +52,41 @@ jobs:
       - name: Build Debug
         shell: pwsh
         run: |
-          msbuild ${{ env.SOLUTION_PATH }} `
+          $result = msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
-            /m /v:minimal
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            /m /v:normal 2>&1
+          
+          # Always print errors and warnings regardless of exit code
+          $result | Where-Object { $_ -match "error CS|error MSB|warning CS|Build FAILED|Build succeeded" } |
+            ForEach-Object { Write-Host $_ }
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Full output around errors:"
+            $result | Where-Object { $_ -match "error|FAILED" } | ForEach-Object { Write-Host $_ }
+            exit $LASTEXITCODE
+          }
 
       - name: Run unit tests
         shell: pwsh
         run: |
-          Write-Host "=== Locating vstest.console.exe ==="
-          # Known path on windows-2022 runner for VS 2022 Enterprise
           $knownPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe"
-          
-          if (Test-Path $knownPath) {
-            $vstest = $knownPath
-          } else {
-            # Fallback: vswhere
+          if (-not (Test-Path $knownPath)) {
             $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-            if (Test-Path $vswhere) {
-              $vstest = & $vswhere -latest -products * -find "**\vstest.console.exe" 2>$null | Select-Object -First 1
-            }
+            $knownPath = & $vswhere -latest -products * -find "**\vstest.console.exe" 2>$null | Select-Object -First 1
           }
+          Write-Host "vstest: $knownPath"
 
-          Write-Host "vstest path: $vstest"
-          if (-not $vstest -or -not (Test-Path $vstest)) {
-            Write-Host "vstest not found at expected paths. Listing available:"
-            Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022" -Filter "vstest.console.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
-            Write-Error "vstest.console.exe not found"
-            exit 1
-          }
+          $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" -Filter "CodeLensAI.Tests.dll" -Recurse |
+                       Select-Object -First 1
+          Write-Host "DLL: $($testDll.FullName)"
 
-          $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
-          Write-Host "Test DLL: $($testDll.FullName)"
-
-          & $vstest $testDll.FullName `
+          & $knownPath $testDll.FullName `
             --logger:"trx;LogFileName=TestResults.trx" `
             --logger:"console;verbosity=detailed"
 
-          Write-Host "vstest exit code: $LASTEXITCODE"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Host "All tests passed"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -110,6 +104,7 @@ jobs:
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
             /m /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify VSIX artifact exists
         shell: pwsh
@@ -165,9 +160,7 @@ jobs:
       - shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Release `
-            /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true /m
+            /p:Configuration=Release /p:DeployExtension=false /p:TreatWarningsAsErrors=true /m
       - id: find_vsix
         shell: pwsh
         run: |

@@ -14,3 +14,6 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 [assembly: AssemblyVersion("1.1.0.0")]
 [assembly: AssemblyFileVersion("1.1.0.0")]
+
+// Allow test project to access internal members
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("CodeLensAI.Tests")]

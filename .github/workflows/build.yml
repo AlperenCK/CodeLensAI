@@ -12,6 +12,7 @@ on:
 env:
   SOLUTION_PATH: CodeLensAI.sln
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
+  TEST_PROJECT_PATH: CodeLensAI.Tests/CodeLensAI.Tests.csproj
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -44,8 +45,8 @@ jobs:
           path: |
             ~/.nuget/packages
             ${{ github.workspace }}\packages
-          key: nuget-v7-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v7-
+          key: nuget-v8-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v8-
 
       - name: Restore packages
         shell: pwsh
@@ -62,7 +63,7 @@ jobs:
             /p:TreatWarningsAsErrors=false /m /v:normal 2>&1
           $warnErr = $output | Where-Object { $_ -match "warning CS|warning MSB|error CS|error MSB|Build FAILED" }
           if ($warnErr) { $warnErr | ForEach-Object { Write-Host $_ } }
-          else { Write-Host "Clean — no warnings or errors" }
+          else { Write-Host "Clean build — no warnings" }
 
       - name: Build Debug (strict)
         shell: pwsh
@@ -73,49 +74,17 @@ jobs:
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run unit tests (xunit.runner.console)
+      - name: Run unit tests (msbuild xunit target)
         shell: pwsh
         run: |
-          # Locate xunit.console.exe from NuGet packages cache
-          $xunitRunner = Get-ChildItem "$env:USERPROFILE\.nuget\packages\xunit.runner.console" `
-            -Filter "xunit.console.exe" -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match "net472" } |
-            Select-Object -First 1
-
-          if (-not $xunitRunner) {
-            # Try local packages folder
-            $xunitRunner = Get-ChildItem "${{ github.workspace }}\packages\xunit.runner.console*" `
-              -Filter "xunit.console.exe" -Recurse -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -match "net472" } |
-              Select-Object -First 1
-          }
-
-          if (-not $xunitRunner) {
-            Write-Host "xunit.console.exe not found, searching all drives..."
-            $xunitRunner = Get-ChildItem "C:\" -Filter "xunit.console.exe" `
-              -Recurse -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -match "net472" } |
-              Select-Object -First 1
-          }
-
-          Write-Host "xunit runner: $($xunitRunner.FullName)"
-
-          $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" `
-            -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-
-          if (-not $testDll) {
-            Write-Host "Listing bin folder:"
-            Get-ChildItem "CodeLensAI.Tests\bin" -Recurse -ErrorAction SilentlyContinue |
-              ForEach-Object { Write-Host $_.FullName }
-            Write-Error "Test DLL not found"
-            exit 1
-          }
-          Write-Host "Test DLL: $($testDll.FullName)"
-
-          & $xunitRunner.FullName $testDll.FullName -xml TestResults.xml -verbose
+          msbuild ${{ env.TEST_PROJECT_PATH }} `
+            /t:xunit `
+            /p:Configuration=Debug `
+            /p:XunitXmlOutput=true `
+            /p:XunitXmlOutputPath=${{ github.workspace }}\TestResults.xml `
+            /v:normal
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Tests FAILED"
+            Write-Error "Unit tests FAILED"
             exit $LASTEXITCODE
           }
           Write-Host "All tests passed"

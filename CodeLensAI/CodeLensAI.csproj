@@ -35,6 +35,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DeployExtension>false</DeployExtension>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -43,6 +44,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DeployExtension>false</DeployExtension>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -59,7 +61,7 @@
     <!-- VS SDK: ExcludeAssets=runtime means DLLs are NOT copied to output/VSIX
          (they live in VS installation) — exactly as VS template does it -->
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" NoWarn="NU1604" />
-    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.13.2127" NoWarn="NU1604" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2094" NoWarn="NU1604" />
     <!-- Newtonsoft: no ExcludeAssets — DLL IS copied to output and bundled in VSIX -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>

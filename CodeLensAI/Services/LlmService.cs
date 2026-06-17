@@ -144,6 +144,20 @@ namespace CodeLensAI.Services
             return client;
         }
 
+
+        /// <summary>
+        /// Test-only factory: creates an LlmService with a pre-built HttpClient
+        /// (e.g. backed by a mock handler). Not for production use.
+        /// </summary>
+        internal static LlmService CreateForTest(LlmOptions options, HttpClient httpClient)
+        {
+            var service = new LlmService(options);
+            // Replace the internally-built client with the test-supplied one
+            service._httpClient.Dispose();
+            service._httpClient = httpClient;
+            return service;
+        }
+
         private void ThrowIfDisposed()
         {
             if (_disposed)

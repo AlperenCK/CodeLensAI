@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.Design;
+using CodeLensAI.Services;
 using CodeLensAI.ToolWindows;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -10,26 +11,26 @@ namespace CodeLensAI.Commands
 {
     /// <summary>
     /// "Analyze with CodeLens AI" command.
-    /// Registered via Tools menu and editor context menu.
-    /// Grabs selected text, opens the ChatWindow, and pre-fills the code area.
+    /// Opens the <see cref="ChatWindow"/>, injects the <see cref="ILlmHost"/>,
+    /// and pre-fills the code box with the current editor selection.
     /// </summary>
     internal sealed class AnalyzeCommand
     {
-        // Command set GUID — must match the .vsct / Menus.ctmenu
         public static readonly Guid CommandSet =
             new Guid("b2c3d4e5-f6a7-8901-bcde-f12345678901");
 
         public const int CommandId = 0x0100;
 
         private readonly AsyncPackage _package;
+        private readonly ILlmHost _host;
 
-        private AnalyzeCommand(AsyncPackage package, OleMenuCommandService commandService)
+        private AnalyzeCommand(AsyncPackage package, ILlmHost host, OleMenuCommandService commandService)
         {
             _package = package ?? throw new ArgumentNullException(nameof(package));
+            _host = host ?? throw new ArgumentNullException(nameof(host));
 
             var menuCommandId = new CommandID(CommandSet, CommandId);
             var menuItem = new OleMenuCommand(Execute, menuCommandId);
-            menuItem.BeforeQueryStatus += OnBeforeQueryStatus;
             commandService.AddCommand(menuItem);
         }
 
@@ -42,20 +43,13 @@ namespace CodeLensAI.Commands
                 as OleMenuCommandService
                 ?? throw new InvalidOperationException("Could not obtain IMenuCommandService.");
 
-            _ = new AnalyzeCommand(package, commandService);
+            // Package implements ILlmHost
+            var host = (ILlmHost)package;
+
+            _ = new AnalyzeCommand(package, host, commandService);
         }
 
-        private void OnBeforeQueryStatus(object sender, EventArgs e)
-        {
-            // Command is always visible; enabled only when editor is active
-            if (sender is OleMenuCommand cmd)
-                cmd.Enabled = true;
-        }
-
-        private void Execute(object sender, EventArgs e)
-        {
-            _ = ExecuteAsync();
-        }
+        private void Execute(object sender, EventArgs e) => _ = ExecuteAsync();
 
         private async Task ExecuteAsync()
         {
@@ -64,7 +58,7 @@ namespace CodeLensAI.Commands
             try
             {
                 var selectedText = GetSelectedTextFromEditor();
-                await OpenChatWindowWithCodeAsync(selectedText);
+                await OpenChatWindowAsync(selectedText);
             }
             catch (Exception ex)
             {
@@ -92,7 +86,7 @@ namespace CodeLensAI.Commands
             return selectedText ?? string.Empty;
         }
 
-        private async Task OpenChatWindowWithCodeAsync(string selectedCode)
+        private async Task OpenChatWindowAsync(string selectedCode)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
@@ -103,12 +97,15 @@ namespace CodeLensAI.Commands
                 cancellationToken: _package.DisposalToken) as ChatWindow;
 
             if (window?.Frame == null)
-                throw new InvalidOperationException("Could not create or show the CodeLens AI Chat window.");
+                throw new InvalidOperationException(
+                    "Could not create or show the CodeLens AI Chat window.");
 
             var windowFrame = (IVsWindowFrame)window.Frame;
             Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(windowFrame.Show());
 
-            // Pass the selected code to the window's control
+            // Inject host + pre-fill code — no global service lookup
+            window.SetHost(_host);
+
             if (window.Content is ChatWindowControl control)
                 control.SetSelectedCode(selectedCode);
         }

@@ -144,7 +144,7 @@ namespace CodeLensAI.ToolWindows
             try
             {
                 var result = await _host
-                    .AnalyzeAsync(selectedCode, userMessage, token)
+                    .AnalyzeAsync(selectedCode, userMessage!, token)
                     .ConfigureAwait(true); // marshal back to UI thread
 
                 if (result.Success)

@@ -1,6 +1,9 @@
 using CodeLensAI.Options;
 using Xunit;
 
+#nullable disable  // Test files — nullable strictness not required
+
+
 namespace CodeLensAI.Tests
 {
     /// <summary>

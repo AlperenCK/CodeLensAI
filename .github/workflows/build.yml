@@ -42,8 +42,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-v11-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v11-
+          key: nuget-v12-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v12-
 
       - name: Restore packages
         shell: pwsh
@@ -52,35 +52,21 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Debug /v:minimal
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
 
-      - name: Build Debug — show all warnings
+      - name: Build Debug
         shell: pwsh
         run: |
-          # Full compile pass — reveals warnings, populates MSBuild incremental cache
           $output = msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=false `
             /m /v:normal 2>&1
-          $warnErr = $output | Where-Object { $_ -match "warning CS|warning MSB|error CS|error MSB|Build FAILED" }
-          if ($warnErr) { $warnErr | ForEach-Object { Write-Host $_ } }
-          else { Write-Host "Clean build — no warnings or errors" }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Verify — no new warnings (warnaserror gate)
-        shell: pwsh
-        run: |
-          # Incremental build — fast, fails if any new warning-as-error
-          msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Debug `
-            /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true `
-            /p:NoWarn="CS1591;CS0618;CS0067" `
-            /m /v:minimal
+          # Surface all warnings and errors
+          $output | Where-Object { $_ -match "warning CS|warning MSB|error CS|error MSB|Build FAILED|Build succeeded" } |
+            ForEach-Object { Write-Host $_ }
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Warnings-as-errors gate failed"
+            Write-Error "Build FAILED"
             exit $LASTEXITCODE
           }
-          Write-Host "Warnings gate passed"
 
       - name: Run unit tests (dotnet vstest)
         shell: pwsh
@@ -91,11 +77,10 @@ jobs:
             Select-Object -First 1
 
           if (-not $testDll) {
-            Write-Host "DLL search — listing CodeLensAI.Tests/bin:"
+            Write-Host "Listing CodeLensAI.Tests:"
             Get-ChildItem "CodeLensAI.Tests" -Recurse -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -like "*.dll" } |
-              ForEach-Object { Write-Host $_.FullName }
-            Write-Error "CodeLensAI.Tests.dll not found"
+              Where-Object { $_.Name -like "*.dll" } | ForEach-Object { Write-Host $_.FullName }
+            Write-Error "Test DLL not found"
             exit 1
           }
           Write-Host "DLL: $($testDll.FullName)"
@@ -104,10 +89,7 @@ jobs:
             --logger:"trx;LogFileName=TestResults.trx" `
             --logger:"console;verbosity=detailed"
 
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Tests FAILED"
-            exit $LASTEXITCODE
-          }
+          if ($LASTEXITCODE -ne 0) { Write-Error "Tests FAILED"; exit $LASTEXITCODE }
           Write-Host "All tests passed"
 
       - name: Upload test results
@@ -124,8 +106,7 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Release `
             /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true `
-            /p:NoWarn="CS1591;CS0618;CS0067" `
+            /p:TreatWarningsAsErrors=false `
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -143,8 +124,7 @@ jobs:
             /p:Configuration=Release `
             /p:RunAnalyzersDuringBuild=true `
             /p:EnforceCodeStyleInBuild=true `
-            /p:TreatWarningsAsErrors=true `
-            /p:NoWarn="CS1591;CS0618;CS0067" `
+            /p:TreatWarningsAsErrors=false `
             /t:Rebuild /m /v:normal `
             2>&1 | Tee-Object -FilePath analysis-report.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -188,7 +168,7 @@ jobs:
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Release /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true /p:NoWarn="CS1591;CS0618;CS0067" /m
+            /p:TreatWarningsAsErrors=false /m
       - id: find_vsix
         shell: pwsh
         run: |

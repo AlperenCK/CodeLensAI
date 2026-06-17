@@ -46,13 +46,20 @@ namespace CodeLensAI.ToolWindows
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            // Open VS Options dialog to our page
+            // Navigate user to options via shell command
             try
             {
-                var dte = Microsoft.VisualStudio.Shell.Package.GetGlobalService(
-                    typeof(EnvDTE.DTE)) as EnvDTE.DTE;
-                dte?.ExecuteCommand("Tools.Options",
-                    "CodeLens AI\\LLM Connection");
+                var cmdWindow = Microsoft.VisualStudio.Shell.Package.GetGlobalService(
+                    typeof(Microsoft.VisualStudio.Shell.Interop.SVsUIShell))
+                    as Microsoft.VisualStudio.Shell.Interop.IVsUIShell;
+                if (cmdWindow != null)
+                {
+                    var guid = System.Guid.Empty;
+                    cmdWindow.PostExecCommand(
+                        ref guid,
+                        (uint)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.ToolsOptions,
+                        0, "CodeLens AI");
+                }
             }
             catch { }
         }
@@ -125,7 +132,6 @@ namespace CodeLensAI.ToolWindows
             _selectedCode = string.Empty;
             UpdateCodePreview();
 
-            // Hide welcome
             WelcomePanel.Visibility = Visibility.Collapsed;
 
             // Show typing indicator
@@ -335,9 +341,13 @@ namespace CodeLensAI.ToolWindows
 
         private void ClearChatHistory()
         {
-            ChatPanel.Children.Clear();
+            // Remove dynamic bubbles (added at runtime) but keep WelcomePanel (XAML static)
+            for (int i = ChatPanel.Children.Count - 1; i >= 0; i--)
+            {
+                if (ChatPanel.Children[i] != WelcomePanel)
+                    ChatPanel.Children.RemoveAt(i);
+            }
             WelcomePanel.Visibility = Visibility.Visible;
-            ChatPanel.Children.Add(WelcomePanel);
         }
 
         private void ScrollToBottom()

@@ -21,8 +21,12 @@
     <Nullable>enable</Nullable>
     <RuntimeIdentifier>win</RuntimeIdentifier>
 
-    <!-- Resolve VSToolsPath using MSBuildExtensionsPath (works for all VS 2022 editions) -->
-    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <!--
+      VSToolsPath: resolves to the VSSDK targets folder regardless of VS edition.
+      $(MSBuildExtensionsPath) = C:\Program Files\Microsoft Visual Studio\2022\<Edition>\MSBuild
+      Hardcode v17.0 so it works even when $(VisualStudioVersion) is not set.
+    -->
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v17.0</VSToolsPath>
 
     <!-- VSIX packaging -->
     <DeployExtension>false</DeployExtension>

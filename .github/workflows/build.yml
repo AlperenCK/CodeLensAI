@@ -12,7 +12,6 @@ on:
 env:
   SOLUTION_PATH: CodeLensAI.sln
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
-  TEST_PROJECT_PATH: CodeLensAI.Tests/CodeLensAI.Tests.csproj
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -43,8 +42,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-v9-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v9-
+          key: nuget-v10-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v10-
 
       - name: Restore packages
         shell: pwsh
@@ -53,17 +52,7 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Debug /v:minimal
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
 
-      - name: Diagnose warnings
-        shell: pwsh
-        run: |
-          $output = msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Debug /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=false /m /v:normal 2>&1
-          $warnErr = $output | Where-Object { $_ -match "warning CS|warning MSB|error CS|error MSB|Build FAILED" }
-          if ($warnErr) { $warnErr | ForEach-Object { Write-Host $_ } }
-          else { Write-Host "Clean build" }
-
-      - name: Build Debug (strict)
+      - name: Build Debug
         shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
@@ -72,17 +61,30 @@ jobs:
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run unit tests
+      - name: Run unit tests (dotnet vstest)
         shell: pwsh
         run: |
-          Write-Host "=== dotnet test net472 ==="
-          dotnet test ${{ env.TEST_PROJECT_PATH }} `
-            --no-build `
-            --framework net472 `
-            --configuration Debug `
-            --verbosity normal `
-            --logger "trx;LogFileName=TestResults.trx" `
-            --logger "console;verbosity=detailed"
+          Write-Host "=== Locating test DLL ==="
+          # SDK-style net472 outputs to bin/Debug/net472/
+          $testDll = Get-ChildItem "CodeLensAI.Tests" `
+            -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "Debug" } |
+            Select-Object -First 1
+
+          if (-not $testDll) {
+            Write-Host "Listing CodeLensAI.Tests/bin:"
+            Get-ChildItem "CodeLensAI.Tests\bin" -Recurse -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host $_.FullName }
+            Write-Error "CodeLensAI.Tests.dll not found"
+            exit 1
+          }
+          Write-Host "Found: $($testDll.FullName)"
+
+          Write-Host "=== Running dotnet vstest ==="
+          dotnet vstest $testDll.FullName `
+            --logger:"trx;LogFileName=TestResults.trx" `
+            --logger:"console;verbosity=detailed"
+
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Tests FAILED (exit $LASTEXITCODE)"
             exit $LASTEXITCODE

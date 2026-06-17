@@ -76,7 +76,7 @@ namespace CodeLensAI.Commands
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            var textManager = _package.GetService(typeof(SVsTextManager)) as IVsTextManager2;
+            var textManager = Package.GetGlobalService(typeof(SVsTextManager)) as IVsTextManager2;
             if (textManager == null) return string.Empty;
 
             textManager.GetActiveView2(1, null, (uint)_VIEWFRAMETYPE.vftCodeWindow, out var textView);

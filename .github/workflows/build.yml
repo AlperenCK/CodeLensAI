@@ -1,4 +1,4 @@
-name: Build, Analyze & Release CodeLens AI
+name: Build, Test, Analyze & Release CodeLens AI
 
 on:
   push:
@@ -12,23 +12,24 @@ on:
 env:
   SOLUTION_PATH: CodeLensAI.sln
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
+  TEST_PROJECT_PATH: CodeLensAI.Tests/CodeLensAI.Tests.csproj
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
   # ────────────────────────────────────────────────────────────
-  # Job 1 — Build + Code Quality
+  # Job 1 — Build + Test + Code Quality
   # ────────────────────────────────────────────────────────────
   build:
-    name: Build & Analyze (VS 2022)
+    name: Build, Test & Analyze (VS 2022)
     runs-on: windows-2022
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Full history for versioning
+          fetch-depth: 0
 
       - name: Setup MSBuild (VS 2022)
         uses: microsoft/setup-msbuild@v2
@@ -51,48 +52,79 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore ${{ env.SOLUTION_PATH }}
 
-      # ── Debug build (fast feedback) ──
+      # ── Debug build ──
       - name: Build (Debug)
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
-            /m `
-            /v:minimal
+            /m /v:minimal
 
-      # ── Release build for the VSIX artifact ──
+      # ── Run unit tests ──
+      - name: Run unit tests
+        run: |
+          $testDll = Get-ChildItem `
+            -Path "CodeLensAI.Tests/bin/Debug" `
+            -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
+          
+          if (-not $testDll) {
+            Write-Error "Test DLL not found"
+            exit 1
+          }
+
+          $vstest = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe" `
+            $testDll.FullName `
+            --logger:"trx;LogFileName=test-results.trx" `
+            --logger:console `
+            2>&1
+
+          Write-Host $vstest
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unit tests FAILED"
+            exit $LASTEXITCODE
+          }
+          Write-Host "✅ All unit tests passed"
+        shell: pwsh
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: "**/*.trx"
+          retention-days: 30
+
+      # ── Release build for VSIX ──
       - name: Build (Release)
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Release `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
-            /m `
-            /v:minimal
+            /m /v:minimal
 
-      # ── Verify VSIX was produced ──
+      # ── Verify VSIX ──
       - name: Verify VSIX artifact exists
         shell: pwsh
         run: |
           $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
           if ($vsix.Count -eq 0) {
-            Write-Error "No .vsix file found in ${{ env.VSIX_OUTPUT_DIR }}"
+            Write-Error "No .vsix file found"
             exit 1
           }
-          Write-Host "✓ VSIX found: $($vsix[0].FullName) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
+          Write-Host "✓ VSIX: $($vsix[0].Name) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
 
-      # ── Roslyn / .editorconfig code quality report ──
-      - name: Run Roslyn analyzers (code quality gate)
+      # ── Roslyn code quality gate ──
+      - name: Run Roslyn analyzers
         run: |
           msbuild ${{ env.PROJECT_PATH }} `
             /p:Configuration=Release `
             /p:RunAnalyzersDuringBuild=true `
             /p:EnforceCodeStyleInBuild=true `
             /p:TreatWarningsAsErrors=true `
-            /t:Rebuild `
-            /m `
-            /v:normal `
+            /t:Rebuild /m /v:normal `
             2>&1 | Tee-Object -FilePath analysis-report.txt
 
       - name: Upload analysis report
@@ -103,7 +135,7 @@ jobs:
           path: analysis-report.txt
           retention-days: 30
 
-      # ── Upload VSIX artifact (all builds) ──
+      # ── Upload VSIX artifact ──
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
@@ -157,14 +189,6 @@ jobs:
           echo "VSIX_PATH=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
           echo "VSIX_NAME=$($vsix.Name)" >> $env:GITHUB_OUTPUT
 
-      - name: Extract release notes from tag
-        id: tag_message
-        shell: pwsh
-        run: |
-          $msg = git tag -l --format='%(contents)' ${{ github.ref_name }}
-          if (-not $msg) { $msg = "Release ${{ github.ref_name }}" }
-          echo "RELEASE_NOTES=$msg" >> $env:GITHUB_OUTPUT
-
       - name: Create GitHub Release with VSIX
         uses: softprops/action-gh-release@v2
         with:
@@ -177,9 +201,6 @@ jobs:
             1. Download `CodeLensAI.vsix` below
             2. Double-click to install (Visual Studio must be closed)
             3. Reopen VS 2022 → Tools → Options → **CodeLens AI** to configure your LLM endpoint
-
-            ### What's New
-            ${{ steps.tag_message.outputs.RELEASE_NOTES }}
 
             ### Requirements
             - Visual Studio 2022 (version 17.0 or higher)

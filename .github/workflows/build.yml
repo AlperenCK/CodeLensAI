@@ -42,11 +42,9 @@ jobs:
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.nuget/packages
-            ${{ github.workspace }}\packages
-          key: nuget-v8-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v8-
+          path: ~/.nuget/packages
+          key: nuget-v9-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v9-
 
       - name: Restore packages
         shell: pwsh
@@ -63,7 +61,7 @@ jobs:
             /p:TreatWarningsAsErrors=false /m /v:normal 2>&1
           $warnErr = $output | Where-Object { $_ -match "warning CS|warning MSB|error CS|error MSB|Build FAILED" }
           if ($warnErr) { $warnErr | ForEach-Object { Write-Host $_ } }
-          else { Write-Host "Clean build — no warnings" }
+          else { Write-Host "Clean build" }
 
       - name: Build Debug (strict)
         shell: pwsh
@@ -74,17 +72,19 @@ jobs:
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run unit tests (msbuild xunit target)
+      - name: Run unit tests
         shell: pwsh
         run: |
-          msbuild ${{ env.TEST_PROJECT_PATH }} `
-            /t:xunit `
-            /p:Configuration=Debug `
-            /p:XunitXmlOutput=true `
-            /p:XunitXmlOutputPath=${{ github.workspace }}\TestResults.xml `
-            /v:normal
+          Write-Host "=== dotnet test net472 ==="
+          dotnet test ${{ env.TEST_PROJECT_PATH }} `
+            --no-build `
+            --framework net472 `
+            --configuration Debug `
+            --verbosity normal `
+            --logger "trx;LogFileName=TestResults.trx" `
+            --logger "console;verbosity=detailed"
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Unit tests FAILED"
+            Write-Error "Tests FAILED (exit $LASTEXITCODE)"
             exit $LASTEXITCODE
           }
           Write-Host "All tests passed"
@@ -94,7 +94,7 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: "TestResults.xml"
+          path: "**/*.trx"
           retention-days: 30
 
       - name: Build Release

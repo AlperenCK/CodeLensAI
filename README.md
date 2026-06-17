@@ -113,23 +113,23 @@ v1.6.0 ile birlikte CodeLens AI modern bir **sohbet baloncuğu arayüzüne** kav
 │  ● CodeLens AI          qwen3-coder  ⚙  ↺  │
 ├─────────────────────────────────────────────┤
 │                                             │
-│         ●                                  │
-│     CodeLens AI                            │
-│   Kodu seçin, sorunuzu yazın.              │
+│         ●                                   │
+│     CodeLens AI                             │
+│   Kodu seçin, sorunuzu yazın.               │
 │                                             │
-│  ┌──────────────────────────────────────┐  │
-│  │ public int Add(int a, int b) {       │  │  ← Kod önizleme
-│  │   return a - b; // bug               │  │
-│  └──────────────────────────────────────┘  │
-│                         Bu kodda hata var mı? │  ← Kullanıcı
+│  ┌──────────────────────────────────────┐   │
+│  │ public int Add(int a, int b) {       │   │  ← Kod önizleme
+│  │   return a - b; // bug               │   │
+│  └──────────────────────────────────────┘   │
+│                       Bu kodda hata var mı? │  ← Kullanıcı
 │                                             │
-│  ┌──────────────────────────────────────┐  │
-│  │ Evet — `a - b` yerine `a + b` olmalı │  │  ← AI yanıtı
-│  │                          [Kopyala]   │  │
-│  └──────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────┐   │
+│  │ Evet — `a - b` yerine `a + b` olmalı │   │  ← AI yanıtı
+│  │                          [Kopyala]   │   │
+│  └──────────────────────────────────────┘   │
 │                                             │
 ├─────────────────────────────────────────────┤
-│  Sorunuzu yazın… (Ctrl+Enter)     [↑]      │
+│  Sorunuzu yazın… (Ctrl+Enter)     [↑]       │
 └─────────────────────────────────────────────┘
 ```
 

@@ -44,8 +44,8 @@ jobs:
           path: |
             ~/.nuget/packages
             ${{ github.workspace }}\packages
-          key: nuget-v5-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v5-
+          key: nuget-v6-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v6-
 
       - name: Restore packages
         shell: pwsh
@@ -54,60 +54,78 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Debug /v:minimal
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
 
-      - name: Diagnose — show all warnings (no warnaserror)
+      - name: Diagnose warnings
         shell: pwsh
         run: |
-          Write-Host "### DIAGNOSTIC PASS — identifying all warnings ###"
           $output = msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Debug `
-            /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=false `
-            /m /v:normal 2>&1
+            /p:Configuration=Debug /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=false /m /v:normal 2>&1
           $warnings = $output | Where-Object { $_ -match "warning CS|warning MSB" }
-          if ($warnings) {
-            Write-Host "=== WARNINGS FOUND ==="
-            $warnings | ForEach-Object { Write-Host $_ }
-          } else {
-            Write-Host "No warnings found in diagnostic pass"
-          }
-          $errors = $output | Where-Object { $_ -match "error CS|error MSB|Build FAILED" }
-          if ($errors) {
-            Write-Host "=== ERRORS FOUND ==="
-            $errors | ForEach-Object { Write-Host $_ }
-            exit 1
-          }
-          Write-Host "### END DIAGNOSTIC ###"
+          if ($warnings) { $warnings | ForEach-Object { Write-Host $_ } }
+          else { Write-Host "No warnings" }
 
-      - name: Build Debug (strict — warnaserror)
+      - name: Build Debug (strict)
         shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Debug `
-            /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true `
-            /p:NoWarn="CS1591" `
-            /m /v:minimal 2>&1 | ForEach-Object {
-              if ($_ -match "error CS|error MSB|Build FAILED") { Write-Host "##[error]$_" }
-              else { Write-Host $_ }
-            }
+            /p:Configuration=Debug /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=true /p:NoWarn="CS1591" `
+            /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run unit tests
         shell: pwsh
         run: |
-          $vstest = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe"
-          if (-not (Test-Path $vstest)) {
-            $vstest = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-              -latest -products * -find "**\vstest.console.exe" 2>$null | Select-Object -First 1
-          }
-          Write-Host "vstest: $vstest"
+          Write-Host "=== Finding test DLL ==="
           $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" `
-            -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
-          Write-Host "DLL: $($testDll.FullName)"
-          & $vstest $testDll.FullName `
-            --logger:"trx;LogFileName=TestResults.trx" `
-            --logger:"console;verbosity=detailed"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+
+          if (-not $testDll) {
+            Write-Host "DLL not in Debug, searching all output folders..."
+            $testDll = Get-ChildItem "CodeLensAI.Tests\bin" `
+              -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+          }
+
+          if (-not $testDll) {
+            Write-Host "Listing CodeLensAI.Tests/bin:"
+            Get-ChildItem "CodeLensAI.Tests\bin" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object FullName | ForEach-Object { Write-Host $_.FullName }
+            Write-Error "Test DLL not found"
+            exit 1
+          }
+          Write-Host "Test DLL: $($testDll.FullName)"
+
+          Write-Host "=== Finding vstest ==="
+          # Try dotnet vstest first (most reliable cross-edition)
+          $dotnetVstest = & dotnet vstest --help 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Using dotnet vstest"
+            dotnet vstest $testDll.FullName `
+              --logger:"trx;LogFileName=TestResults.trx" `
+              --logger:"console;verbosity=detailed"
+          } else {
+            # Fallback: find vstest.console.exe anywhere under VS install
+            $vstest = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022" `
+              -Filter "vstest.console.exe" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if (-not $vstest) {
+              $vstest = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+                -latest -products * -find "**\vstest.console.exe" 2>$null |
+                Select-Object -First 1
+            }
+            Write-Host "vstest: $vstest"
+            & $vstest $testDll.FullName `
+              --logger:"trx;LogFileName=TestResults.trx" `
+              --logger:"console;verbosity=detailed"
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Tests FAILED (exit $LASTEXITCODE)"
+            exit $LASTEXITCODE
+          }
+          Write-Host "All tests passed"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -121,10 +139,8 @@ jobs:
         shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Release `
-            /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true `
-            /p:NoWarn="CS1591" `
+            /p:Configuration=Release /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=true /p:NoWarn="CS1591" `
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -139,12 +155,9 @@ jobs:
         shell: pwsh
         run: |
           msbuild ${{ env.PROJECT_PATH }} `
-            /p:Configuration=Release `
-            /p:RunAnalyzersDuringBuild=true `
-            /p:EnforceCodeStyleInBuild=true `
-            /p:TreatWarningsAsErrors=true `
-            /p:NoWarn="CS1591" `
-            /t:Rebuild /m /v:normal `
+            /p:Configuration=Release /p:RunAnalyzersDuringBuild=true `
+            /p:EnforceCodeStyleInBuild=true /p:TreatWarningsAsErrors=true `
+            /p:NoWarn="CS1591" /t:Rebuild /m /v:normal `
             2>&1 | Tee-Object -FilePath analysis-report.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

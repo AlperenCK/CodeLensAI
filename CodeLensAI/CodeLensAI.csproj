@@ -102,6 +102,11 @@
       <SubType>Designer</SubType>
     </None>
     <Content Include="Resources\icon.png" />
+    <Content Include="..\packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll">
+      <Link>Newtonsoft.Json.dll</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\preview.png" />
     <Content Include="..\LICENSE.txt">
       <Link>LICENSE.txt</Link>

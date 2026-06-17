@@ -12,18 +12,23 @@
       select code in the editor, describe your problem, and get instant AI-powered analysis
       and suggestions — all without leaving Visual Studio.
     </Description>
-    <MoreInfo>https://github.com/your-org/CodeLensAI</MoreInfo>
+    <MoreInfo>https://github.com/AlperenCK/CodeLensAI</MoreInfo>
     <License>LICENSE.txt</License>
     <ReleaseNotes>Initial release — v1.0.0</ReleaseNotes>
     <Icon>Resources\icon.png</Icon>
     <PreviewImage>Resources\preview.png</PreviewImage>
     <Tags>AI, LLM, Ollama, code analysis, productivity, local AI</Tags>
-    <GettingStartedGuide>https://github.com/your-org/CodeLensAI#getting-started</GettingStartedGuide>
   </Metadata>
-  <Installation>
-    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,)" />
-    <InstallationTarget Id="Microsoft.VisualStudio.Professional" Version="[17.0,)" />
-    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.0,)" />
+  <Installation AllUsers="true">
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Professional" Version="[17.0,)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.0,)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
   </Installation>
   <Dependencies>
     <Dependency Id="Microsoft.Framework.NDP"

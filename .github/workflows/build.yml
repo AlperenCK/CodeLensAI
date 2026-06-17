@@ -12,10 +12,8 @@ on:
 env:
   SOLUTION_PATH: CodeLensAI.sln
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
-  TEST_PROJECT_PATH: CodeLensAI.Tests/CodeLensAI.Tests.csproj
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
   build:
@@ -23,126 +21,99 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup MSBuild (VS 2022)
-        uses: microsoft/setup-msbuild@v2
+      - uses: microsoft/setup-msbuild@v2
         with:
           vs-version: '[17.0,18.0)'
           msbuild-architecture: x64
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
+      - uses: NuGet/setup-nuget@v2
         with:
           nuget-version: '6.x'
 
-      - name: Cache NuGet packages
+      - name: Cache NuGet
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-v13-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v13-
+          key: nuget-v14-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-v14-
 
-      - name: Restore packages
+      - name: Restore
         shell: pwsh
         run: |
           nuget restore ${{ env.SOLUTION_PATH }}
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Debug /v:minimal
-          msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
 
-      - name: Build solution (Debug)
+      - name: Build Debug
         shell: pwsh
         run: |
-          $output = msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Debug `
-            /p:DeployExtension=false `
-            /m /v:normal 2>&1
-          $output | Where-Object { $_ -match "warning|error|FAILED|succeeded" } |
-            ForEach-Object { Write-Host $_ }
+          msbuild ${{ env.SOLUTION_PATH }} /p:Configuration=Debug /p:DeployExtension=false /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run unit tests
+      - name: Run tests (continue on error to read output)
         shell: pwsh
+        continue-on-error: true
+        id: tests
         run: |
-          # Show what was built
-          Write-Host "=== Test project bin contents ==="
-          Get-ChildItem "CodeLensAI.Tests\bin" -Recurse -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host $_.FullName }
+          $testDll = Get-ChildItem "CodeLensAI.Tests" -Filter "CodeLensAI.Tests.dll" -Recurse |
+            Where-Object { $_.FullName -notmatch "ref\\" } | Select-Object -First 1
+          Write-Host "DLL: $($testDll.FullName)"
+          dotnet vstest "$($testDll.FullName)" --logger:"trx;LogFileName=${{ github.workspace }}\TR.trx" --logger:"console;verbosity=detailed"
+          echo "TEST_EXIT=$LASTEXITCODE" >> $env:GITHUB_OUTPUT
 
-          # Find the test DLL
-          $testDll = Get-ChildItem "CodeLensAI.Tests\bin" `
-            -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-
-          if (-not $testDll) {
-            Write-Error "Test DLL not found after build"
-            exit 1
-          }
-          Write-Host "Test DLL: $($testDll.FullName)"
-
-          # Run with dotnet vstest
-          dotnet vstest "$($testDll.FullName)" `
-            --logger:"trx;LogFileName=${{ github.workspace }}\TestResults.trx" `
-            --logger:"console;verbosity=detailed"
-
-          $exit = $LASTEXITCODE
-          Write-Host "dotnet vstest exit code: $exit"
-          if ($exit -ne 0) { exit $exit }
-          Write-Host "✅ All tests passed"
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
+      - name: Print TRX results
+        shell: pwsh
         if: always()
-        with:
-          name: test-results
-          path: "*.trx"
-          retention-days: 30
+        run: |
+          if (Test-Path "${{ github.workspace }}\TR.trx") {
+            $trx = Get-Content "${{ github.workspace }}\TR.trx" -Raw
+            Write-Host "=== TRX CONTENT ==="
+            Write-Host $trx
+          } else {
+            Write-Host "No TRX file found"
+            Get-ChildItem "${{ github.workspace }}" -Filter "*.trx" -Recurse | ForEach-Object { Write-Host $_.FullName }
+          }
+
+      - name: Fail if tests failed
+        shell: pwsh
+        if: steps.tests.outputs.TEST_EXIT != '0'
+        run: |
+          Write-Error "Tests failed with exit code ${{ steps.tests.outputs.TEST_EXIT }}"
+          exit 1
 
       - name: Build Release
         shell: pwsh
         run: |
-          msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Release `
-            /p:DeployExtension=false `
-            /m /v:minimal
+          msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
+          msbuild ${{ env.SOLUTION_PATH }} /p:Configuration=Release /p:DeployExtension=false /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify VSIX
         shell: pwsh
         run: |
           $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
-          if ($vsix.Count -eq 0) { Write-Error "No .vsix file found"; exit 1 }
+          if ($vsix.Count -eq 0) { Write-Error "No .vsix"; exit 1 }
           Write-Host "VSIX: $($vsix[0].Name) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
 
       - name: Run Roslyn analyzers
         shell: pwsh
         run: |
-          msbuild ${{ env.PROJECT_PATH }} `
-            /p:Configuration=Release `
-            /p:RunAnalyzersDuringBuild=true `
-            /p:EnforceCodeStyleInBuild=true `
-            /t:Rebuild /m /v:normal `
-            2>&1 | Tee-Object -FilePath analysis-report.txt
+          msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /p:RunAnalyzersDuringBuild=true /p:EnforceCodeStyleInBuild=true /t:Rebuild /m /v:normal 2>&1 | Tee-Object analysis-report.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Upload analysis report
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: code-quality-report
-          path: analysis-report.txt
+          name: ci-artifacts-${{ github.sha }}
+          path: |
+            *.trx
+            analysis-report.txt
+            ${{ env.VSIX_OUTPUT_DIR }}/*.vsix
           retention-days: 30
-
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: CodeLensAI-vsix-${{ github.sha }}
-          path: ${{ env.VSIX_OUTPUT_DIR }}/*.vsix
-          retention-days: 90
-          if-no-files-found: error
 
   release:
     name: Publish GitHub Release
@@ -163,8 +134,6 @@ jobs:
         run: |
           nuget restore ${{ env.SOLUTION_PATH }}
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
-      - shell: pwsh
-        run: |
           msbuild ${{ env.SOLUTION_PATH }} /p:Configuration=Release /p:DeployExtension=false /m
       - id: find_vsix
         shell: pwsh
@@ -175,9 +144,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: "CodeLens AI ${{ github.ref_name }}"
-          body: |
-            Download and double-click `.vsix` to install.
-            Requires Visual Studio 2022 (17.0+) and a local LLM server.
+          body: Download `.vsix` below. Requires VS 2022 (17.0+) and a local LLM server.
           files: ${{ steps.find_vsix.outputs.VSIX_PATH }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

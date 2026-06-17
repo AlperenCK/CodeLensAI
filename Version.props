@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <!-- Uygulama versiyonu — AssemblyInfo ve vsixmanifest buradan beslenir -->
+    <CodeLensAIVersion>1.6.0</CodeLensAIVersion>
+
+    <!-- NuGet paket versiyonları — tek yerden yönetim -->
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+    <VisualStudioSDKVersion>17.0.32112.339</VisualStudioSDKVersion>
+    <VSSdkBuildToolsVersion>17.14.2094</VSSdkBuildToolsVersion>
+  </PropertyGroup>
+</Project>

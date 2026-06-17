@@ -49,45 +49,46 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore ${{ env.SOLUTION_PATH }}
 
-      - name: Build Debug
+      - name: Show all warnings (no warnaserror - diagnostics)
+        shell: pwsh
+        run: |
+          Write-Host "### DIAGNOSTIC BUILD - showing all CS warnings ###"
+          $output = msbuild ${{ env.SOLUTION_PATH }} `
+            /p:Configuration=Debug `
+            /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=false `
+            /m /v:normal 2>&1
+          $output | Where-Object { $_ -match "warning CS|error CS|warning MSB|error MSB|Build FAILED|Build succeeded" } |
+            ForEach-Object { Write-Host $_ }
+          Write-Host "### END DIAGNOSTIC ###"
+
+      - name: Build Debug (strict)
         shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
-            /m /v:minimal
+            /m /v:normal 2>&1 | ForEach-Object {
+              if ($_ -match "error CS|error MSB|warning CS|warning MSB|Build FAILED") {
+                Write-Host "##[error]$_"
+              } else {
+                Write-Host $_
+              }
+            }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run unit tests (xUnit via MSBuild runner)
+      - name: Run unit tests
         shell: pwsh
         run: |
-          # Locate vstest.console.exe via vswhere
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vstest  = & $vswhere -latest -products * -find "**\vstest.console.exe" 2>$null |
                        Select-Object -First 1
-
-          Write-Host "vstest path: $vstest"
-
-          $testDll = Get-ChildItem `
-            -Path "CodeLensAI.Tests\bin\Debug" `
-            -Filter "CodeLensAI.Tests.dll" -Recurse |
-            Select-Object -First 1
-
-          if (-not $testDll) {
-            Write-Error "CodeLensAI.Tests.dll not found under CodeLensAI.Tests\bin\Debug"
-            exit 1
-          }
-          Write-Host "Test DLL: $($testDll.FullName)"
-
-          & $vstest $testDll.FullName `
-            --logger:"trx;LogFileName=TestResults.trx" `
-            --logger:"console;verbosity=detailed"
-
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Unit tests FAILED (exit $LASTEXITCODE)"
-            exit $LASTEXITCODE
-          }
-          Write-Host "✅ All unit tests passed"
+          Write-Host "vstest: $vstest"
+          $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
+          if (-not $testDll) { Write-Error "DLL not found"; exit 1 }
+          & $vstest $testDll.FullName --logger:"trx;LogFileName=TestResults.trx" --logger:"console;verbosity=detailed"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

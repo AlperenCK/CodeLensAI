@@ -44,8 +44,8 @@ jobs:
           path: |
             ~/.nuget/packages
             ${{ github.workspace }}\packages
-          key: nuget-v6-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v6-
+          key: nuget-v7-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v7-
 
       - name: Restore packages
         shell: pwsh
@@ -60,9 +60,9 @@ jobs:
           $output = msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=false /m /v:normal 2>&1
-          $warnings = $output | Where-Object { $_ -match "warning CS|warning MSB" }
-          if ($warnings) { $warnings | ForEach-Object { Write-Host $_ } }
-          else { Write-Host "No warnings" }
+          $warnErr = $output | Where-Object { $_ -match "warning CS|warning MSB|error CS|error MSB|Build FAILED" }
+          if ($warnErr) { $warnErr | ForEach-Object { Write-Host $_ } }
+          else { Write-Host "Clean — no warnings or errors" }
 
       - name: Build Debug (strict)
         shell: pwsh
@@ -73,56 +73,49 @@ jobs:
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run unit tests
+      - name: Run unit tests (xunit.runner.console)
         shell: pwsh
         run: |
-          Write-Host "=== Finding test DLL ==="
+          # Locate xunit.console.exe from NuGet packages cache
+          $xunitRunner = Get-ChildItem "$env:USERPROFILE\.nuget\packages\xunit.runner.console" `
+            -Filter "xunit.console.exe" -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "net472" } |
+            Select-Object -First 1
+
+          if (-not $xunitRunner) {
+            # Try local packages folder
+            $xunitRunner = Get-ChildItem "${{ github.workspace }}\packages\xunit.runner.console*" `
+              -Filter "xunit.console.exe" -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "net472" } |
+              Select-Object -First 1
+          }
+
+          if (-not $xunitRunner) {
+            Write-Host "xunit.console.exe not found, searching all drives..."
+            $xunitRunner = Get-ChildItem "C:\" -Filter "xunit.console.exe" `
+              -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "net472" } |
+              Select-Object -First 1
+          }
+
+          Write-Host "xunit runner: $($xunitRunner.FullName)"
+
           $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" `
             -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
             Select-Object -First 1
 
           if (-not $testDll) {
-            Write-Host "DLL not in Debug, searching all output folders..."
-            $testDll = Get-ChildItem "CodeLensAI.Tests\bin" `
-              -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
-              Select-Object -First 1
-          }
-
-          if (-not $testDll) {
-            Write-Host "Listing CodeLensAI.Tests/bin:"
+            Write-Host "Listing bin folder:"
             Get-ChildItem "CodeLensAI.Tests\bin" -Recurse -ErrorAction SilentlyContinue |
-              Select-Object FullName | ForEach-Object { Write-Host $_.FullName }
+              ForEach-Object { Write-Host $_.FullName }
             Write-Error "Test DLL not found"
             exit 1
           }
           Write-Host "Test DLL: $($testDll.FullName)"
 
-          Write-Host "=== Finding vstest ==="
-          # Try dotnet vstest first (most reliable cross-edition)
-          $dotnetVstest = & dotnet vstest --help 2>&1
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Using dotnet vstest"
-            dotnet vstest $testDll.FullName `
-              --logger:"trx;LogFileName=TestResults.trx" `
-              --logger:"console;verbosity=detailed"
-          } else {
-            # Fallback: find vstest.console.exe anywhere under VS install
-            $vstest = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022" `
-              -Filter "vstest.console.exe" -Recurse -ErrorAction SilentlyContinue |
-              Select-Object -First 1
-            if (-not $vstest) {
-              $vstest = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-                -latest -products * -find "**\vstest.console.exe" 2>$null |
-                Select-Object -First 1
-            }
-            Write-Host "vstest: $vstest"
-            & $vstest $testDll.FullName `
-              --logger:"trx;LogFileName=TestResults.trx" `
-              --logger:"console;verbosity=detailed"
-          }
-
+          & $xunitRunner.FullName $testDll.FullName -xml TestResults.xml -verbose
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Tests FAILED (exit $LASTEXITCODE)"
+            Write-Error "Tests FAILED"
             exit $LASTEXITCODE
           }
           Write-Host "All tests passed"
@@ -132,7 +125,7 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: "**/*.trx"
+          path: "TestResults.xml"
           retention-days: 30
 
       - name: Build Release

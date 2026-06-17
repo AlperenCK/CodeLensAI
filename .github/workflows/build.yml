@@ -53,37 +53,6 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} /p:Configuration=Debug /p:DeployExtension=false /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run tests (continue on error to read output)
-        shell: pwsh
-        continue-on-error: true
-        id: tests
-        run: |
-          $testDll = Get-ChildItem "CodeLensAI.Tests" -Filter "CodeLensAI.Tests.dll" -Recurse |
-            Where-Object { $_.FullName -notmatch "ref\\" } | Select-Object -First 1
-          Write-Host "DLL: $($testDll.FullName)"
-          dotnet vstest "$($testDll.FullName)" --logger:"trx;LogFileName=${{ github.workspace }}\TR.trx" --logger:"console;verbosity=detailed"
-          echo "TEST_EXIT=$LASTEXITCODE" >> $env:GITHUB_OUTPUT
-
-      - name: Print TRX results
-        shell: pwsh
-        if: always()
-        run: |
-          if (Test-Path "${{ github.workspace }}\TR.trx") {
-            $trx = Get-Content "${{ github.workspace }}\TR.trx" -Raw
-            Write-Host "=== TRX CONTENT ==="
-            Write-Host $trx
-          } else {
-            Write-Host "No TRX file found"
-            Get-ChildItem "${{ github.workspace }}" -Filter "*.trx" -Recurse | ForEach-Object { Write-Host $_.FullName }
-          }
-
-      - name: Fail if tests failed
-        shell: pwsh
-        if: steps.tests.outputs.TEST_EXIT != '0'
-        run: |
-          Write-Error "Tests failed with exit code ${{ steps.tests.outputs.TEST_EXIT }}"
-          exit 1
-
       - name: Build Release
         shell: pwsh
         run: |

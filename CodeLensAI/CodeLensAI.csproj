@@ -116,15 +116,4 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets"
           Condition="'$(VSToolsPath)' != ''" />
-
-
-
-
-  <Target Name="CopyNewtonsoftToOutput" AfterTargets="Build">
-    <Copy
-      SourceFiles="Z:\nuget\newtonsoft.json\13.0.3\lib\net45\Newtonsoft.Json.dll"
-      DestinationFolder="$(OutputPath)"
-      SkipUnchangedFiles="true"
-      ContinueOnError="false" />
-  </Target>
 </Project>

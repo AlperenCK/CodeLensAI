@@ -46,7 +46,7 @@ namespace CodeLensAI.ToolWindows
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            // Navigate user to options via shell command
+            Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
                 var cmdWindow = Microsoft.VisualStudio.Shell.Package.GetGlobalService(
@@ -125,7 +125,7 @@ namespace CodeLensAI.ToolWindows
 
             // Show user message
             var codeCopy = _selectedCode;
-            AppendUserMessage(message, codeCopy);
+            AppendUserMessage(message!, codeCopy);
 
             // Clear input
             TxtUserMessage.Clear();

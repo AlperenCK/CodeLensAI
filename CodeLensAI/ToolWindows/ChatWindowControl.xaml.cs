@@ -1,11 +1,12 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using CodeLensAI.Services;
+using Microsoft.VisualStudio.Shell;
 
 namespace CodeLensAI.ToolWindows
 {
@@ -26,8 +27,6 @@ namespace CodeLensAI.ToolWindows
             RefreshModelName();
         }
 
-        // ── Public API ────────────────────────────────────────────────────
-
         public void SetHost(ILlmHost host)
         {
             _host = host ?? throw new ArgumentNullException(nameof(host));
@@ -46,22 +45,18 @@ namespace CodeLensAI.ToolWindows
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
+            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
-                var cmdWindow = Microsoft.VisualStudio.Shell.Package.GetGlobalService(
-                    typeof(Microsoft.VisualStudio.Shell.Interop.SVsUIShell))
-                    as Microsoft.VisualStudio.Shell.Interop.IVsUIShell;
-                if (cmdWindow != null)
-                {
-                    var guid = System.Guid.Empty;
-                    cmdWindow.PostExecCommand(
-                        ref guid,
-                        (uint)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.ToolsOptions,
-                        0, "CodeLens AI");
-                }
+                // En güvenilir yol: DTE üzerinden Tools.Options komutunu çalıştır
+                var dte = Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE80.DTE2;
+                dte?.ExecuteCommand("Tools.Options", "CodeLens AI");
             }
-            catch { }
+            catch
+            {
+                // DTE çalışmazsa bilgi balonu göster
+                AppendErrorBubble("Ayarlar için: Tools → Options → CodeLens AI → LLM Connection");
+            }
         }
 
         private void BtnClearAll_Click(object sender, RoutedEventArgs e)
@@ -123,20 +118,15 @@ namespace CodeLensAI.ToolWindows
                 return;
             }
 
-            // Show user message
             var codeCopy = _selectedCode;
             AppendUserMessage(message!, codeCopy);
 
-            // Clear input
             TxtUserMessage.Clear();
             _selectedCode = string.Empty;
             UpdateCodePreview();
-
             WelcomePanel.Visibility = Visibility.Collapsed;
 
-            // Show typing indicator
             SetBusy(true);
-
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
@@ -149,7 +139,7 @@ namespace CodeLensAI.ToolWindows
                 if (result.Success)
                     AppendAiBubble(result.Content);
                 else
-                    AppendErrorBubble(result.ErrorMessage ?? "Bilinmeyen hata.");
+                    AppendErrorBubble(CleanErrorMessage(result.ErrorMessage ?? "Bilinmeyen hata."));
             }
             catch (OperationCanceledException)
             {
@@ -167,19 +157,70 @@ namespace CodeLensAI.ToolWindows
             }
         }
 
+        // ── Error message cleanup ─────────────────────────────────────────
+
+        /// <summary>
+        /// LLM hata mesajlarından HTML ve gürültüyü temizler.
+        /// 503 gibi durumlarda LiteLLM HTML sayfası döndürebilir.
+        /// </summary>
+        private static string CleanErrorMessage(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return raw;
+
+            // JSON içindeki "message" alanını çıkar
+            var msgMatch = Regex.Match(raw, ""message"\s*:\s*"([^"]+)"");
+            if (msgMatch.Success)
+            {
+                var msg = msgMatch.Groups[1].Value;
+                // HTML içeriyorsa sadece ilk anlamlı satırı al
+                if (msg.Contains("<html") || msg.Contains("\r\n"))
+                {
+                    var firstLine = msg.Split(new[] { "\r\n", "\n", "<" },
+                        StringSplitOptions.RemoveEmptyEntries)[0];
+                    return firstLine.Length > 5 ? firstLine : "Sunucu geçici olarak kullanılamıyor.";
+                }
+                return msg;
+            }
+
+            // Düz HTML gelirse sil
+            if (raw.Contains("<html") || raw.Contains("<!DOCTYPE"))
+                return "Sunucu geçici olarak kullanılamıyor. (503)";
+
+            // HTTP status kodunu öne çıkar
+            var httpMatch = Regex.Match(raw, "HTTP (\d{3})");
+            if (httpMatch.Success)
+            {
+                var code = httpMatch.Groups[1].Value;
+                return code switch
+                {
+                    "401" => "Kimlik doğrulama hatası (401). API key'inizi kontrol edin.",
+                    "403" => "Erişim reddedildi (403). API key izinlerini kontrol edin.",
+                    "404" => "Endpoint bulunamadı (404). URL'yi kontrol edin.",
+                    "429" => "İstek limiti aşıldı (429). Biraz bekleyip tekrar deneyin.",
+                    "500" => "Sunucu hatası (500). LLM sunucusunu kontrol edin.",
+                    "503" => "Sunucu geçici olarak kullanılamıyor (503). Biraz bekleyip tekrar deneyin.",
+                    _ => $"HTTP {code} hatası. LLM sunucusunu kontrol edin."
+                };
+            }
+
+            // 200 karakter üzeriyse kes
+            return raw.Length > 200 ? raw.Substring(0, 200) + "…" : raw;
+        }
+
         // ── Chat bubble builders ──────────────────────────────────────────
 
         private void AppendUserMessage(string message, string code)
         {
             var panel = new StackPanel { Orientation = Orientation.Vertical };
 
-            // Code preview bubble (if code present)
+            // Kod önizleme balonu
             if (!string.IsNullOrEmpty(code))
             {
                 var lines = code.Split('\n');
-                var preview = lines.Length > 3
-                    ? string.Join("\n", lines[0], lines[1], lines[2]) + "\n…"
-                    : code;
+                var previewLines = lines.Length > 4
+                    ? new string[] { lines[0], lines[1], lines[2], lines[3], $"… (+{lines.Length - 4} satır)" }
+                    : lines;
+                var preview = string.Join("\n", previewLines);
 
                 var codeBorder = new Border
                 {
@@ -196,13 +237,13 @@ namespace CodeLensAI.ToolWindows
                     FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New"),
                     FontSize = 10,
                     Foreground = new SolidColorBrush(Color.FromRgb(128, 200, 255)),
-                    TextWrapping = TextWrapping.NoWrap,
-                    TextTrimming = TextTrimming.CharacterEllipsis
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxHeight = 80
                 };
                 panel.Children.Add(codeBorder);
             }
 
-            // Message bubble
+            // Mesaj balonu
             var msgBorder = new Border
             {
                 Background = new SolidColorBrush(Color.FromRgb(0, 120, 212)),
@@ -236,10 +277,8 @@ namespace CodeLensAI.ToolWindows
                 Margin = new Thickness(0, 2, 32, 8),
                 BorderThickness = new Thickness(1)
             };
-            border.SetResourceReference(Border.BackgroundProperty,
-                SystemColors.ControlBrushKey);
-            border.SetResourceReference(Border.BorderBrushProperty,
-                SystemColors.ActiveBorderBrushKey);
+            border.SetResourceReference(Border.BackgroundProperty, SystemColors.ControlBrushKey);
+            border.SetResourceReference(Border.BorderBrushProperty, SystemColors.ActiveBorderBrushKey);
 
             var tb = new TextBlock
             {
@@ -247,10 +286,8 @@ namespace CodeLensAI.ToolWindows
                 FontSize = 12,
                 TextWrapping = TextWrapping.Wrap
             };
-            tb.SetResourceReference(TextBlock.ForegroundProperty,
-                SystemColors.WindowTextBrushKey);
+            tb.SetResourceReference(TextBlock.ForegroundProperty, SystemColors.WindowTextBrushKey);
 
-            // Copy button row
             var copyBtn = new Button
             {
                 Content = "Kopyala",
@@ -262,10 +299,8 @@ namespace CodeLensAI.ToolWindows
                 BorderThickness = new Thickness(1),
                 Cursor = Cursors.Hand
             };
-            copyBtn.SetResourceReference(Button.BorderBrushProperty,
-                SystemColors.ActiveBorderBrushKey);
-            copyBtn.SetResourceReference(Button.ForegroundProperty,
-                SystemColors.GrayTextBrushKey);
+            copyBtn.SetResourceReference(Button.BorderBrushProperty, SystemColors.ActiveBorderBrushKey);
+            copyBtn.SetResourceReference(Button.ForegroundProperty, SystemColors.GrayTextBrushKey);
 
             var captured = content;
             copyBtn.Click += (s, e) => Clipboard.SetText(captured);
@@ -331,17 +366,19 @@ namespace CodeLensAI.ToolWindows
             }
             else
             {
-                var firstLine = _selectedCode.Split('\n')[0];
-                TxtCodePreview.Text = firstLine.Length > 60
-                    ? firstLine.Substring(0, 60) + "…"
-                    : firstLine;
+                var lines = _selectedCode.Split('\n');
+                var preview = lines.Length > 1
+                    ? $"{lines[0].Trim()} … ({lines.Length} satır)"
+                    : lines[0].Trim();
+                TxtCodePreview.Text = preview.Length > 70
+                    ? preview.Substring(0, 70) + "…"
+                    : preview;
                 CodePreviewBorder.Visibility = Visibility.Visible;
             }
         }
 
         private void ClearChatHistory()
         {
-            // Remove dynamic bubbles (added at runtime) but keep WelcomePanel (XAML static)
             for (int i = ChatPanel.Children.Count - 1; i >= 0; i--)
             {
                 if (ChatPanel.Children[i] != WelcomePanel)

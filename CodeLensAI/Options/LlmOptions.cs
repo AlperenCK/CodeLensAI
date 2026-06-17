@@ -1,3 +1,4 @@
+using System.ComponentModel.Design;
 using System.ComponentModel;
 using Microsoft.VisualStudio.Shell;
 
@@ -57,6 +58,22 @@ namespace CodeLensAI.Options
         {
             get => _apiKey;
             set => _apiKey = value ?? string.Empty;
+        }
+
+        private string _modelProfiles = string.Empty;
+
+        [Category("Models")]
+        [DisplayName("Model Profiles")]
+        [Description(
+            "Define multiple model names, one per line (or semicolon-separated). " +
+            "Click the model pill in the chat panel to cycle through them quickly. " +
+            "Example: codellama\ndeepseek-coder:6.7b\nqwen2.5-coder:7b")]
+        [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor),
+                typeof(System.Drawing.Design.UITypeEditor))]
+        public string ModelProfiles
+        {
+            get => _modelProfiles;
+            set => _modelProfiles = value ?? string.Empty;
         }
 
         /// <summary>Maximum tokens the model may generate per response.</summary>

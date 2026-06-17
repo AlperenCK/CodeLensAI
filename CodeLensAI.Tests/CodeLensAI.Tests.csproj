@@ -21,6 +21,8 @@
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- Include VS SDK to ensure assemblies are present in test output -->
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.31902.203" />
   </ItemGroup>
 
   <ItemGroup>

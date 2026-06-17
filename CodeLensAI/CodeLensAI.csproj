@@ -114,12 +114,10 @@
 
 
 
+
   <Target Name="CopyNewtonsoftToOutput" AfterTargets="Build">
-    <PropertyGroup>
-      <NewtonsoftSrc>$(USERPROFILE)\.nuget\packages\newtonsoft.json\13.0.3\lib\net45\Newtonsoft.Json.dll</NewtonsoftSrc>
-    </PropertyGroup>
     <Copy
-      SourceFiles="$(NewtonsoftSrc)"
+      SourceFiles="Z:\nuget\newtonsoft.json\13.0.3\lib\net45\Newtonsoft.Json.dll"
       DestinationFolder="$(OutputPath)"
       SkipUnchangedFiles="true"
       ContinueOnError="false" />

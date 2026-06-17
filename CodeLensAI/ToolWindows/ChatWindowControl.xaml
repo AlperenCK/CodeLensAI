@@ -1,0 +1,205 @@
+<UserControl x:Class="CodeLensAI.ToolWindows.ChatWindowControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="600"
+             d:DesignWidth="400"
+             Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+
+    <UserControl.Resources>
+        <Style x:Key="HeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="#0078D4"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#005A9E"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="CodeBoxStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Courier New"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <!-- Header -->
+            <RowDefinition Height="Auto"/>
+            <!-- Code section -->
+            <RowDefinition Height="120"/>
+            <!-- Message input -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="80"/>
+            <!-- Action buttons -->
+            <RowDefinition Height="Auto"/>
+            <!-- Separator -->
+            <RowDefinition Height="Auto"/>
+            <!-- Response -->
+            <RowDefinition Height="*"/>
+            <!-- Status bar -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Header ── -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="🤖" FontSize="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="CodeLens AI" Style="{StaticResource HeaderTextStyle}"
+                       VerticalAlignment="Center" FontSize="16"/>
+        </StackPanel>
+
+        <!-- ── Selected Code ── -->
+        <Grid Grid.Row="1" Margin="0,0,0,6">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <DockPanel Grid.Row="0" LastChildFill="False">
+                <TextBlock DockPanel.Dock="Left"
+                           Text="Selected Code" Style="{StaticResource LabelStyle}"/>
+                <Button x:Name="BtnClearCode"
+                        DockPanel.Dock="Right"
+                        Content="Clear"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Padding="6,2"
+                        FontSize="10"
+                        Click="BtnClearCode_Click"/>
+            </DockPanel>
+            <TextBox x:Name="TxtSelectedCode"
+                     Grid.Row="1"
+                     Style="{StaticResource CodeBoxStyle}"
+                     IsReadOnly="False"
+                     PlaceholderText="Paste or select code here…"/>
+        </Grid>
+
+        <!-- ── Message label ── -->
+        <TextBlock Grid.Row="2"
+                   Text="Your question or instruction"
+                   Style="{StaticResource LabelStyle}"/>
+
+        <!-- ── User message input ── -->
+        <TextBox x:Name="TxtUserMessage"
+                 Grid.Row="3"
+                 Style="{StaticResource CodeBoxStyle}"
+                 FontFamily="Segoe UI"
+                 FontSize="12"
+                 PlaceholderText="e.g. What does this code do? Fix the bug. Refactor for readability…"
+                 Margin="0,0,0,6"
+                 KeyDown="TxtUserMessage_KeyDown"/>
+
+        <!-- ── Action buttons ── -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="BtnSend"
+                    Content="▶  Analyze"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Click="BtnSend_Click"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="BtnCancel"
+                    Content="✕  Cancel"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    IsEnabled="False"
+                    Click="BtnCancel_Click"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="BtnCopyResponse"
+                    Content="📋 Copy"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    IsEnabled="False"
+                    Click="BtnCopyResponse_Click"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="BtnClearAll"
+                    Content="🗑 Clear All"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Click="BtnClearAll_Click"/>
+        </StackPanel>
+
+        <!-- ── Separator ── -->
+        <Separator Grid.Row="5" Margin="0,0,0,8"/>
+
+        <!-- ── Response area ── -->
+        <Grid Grid.Row="6">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0"
+                       Text="Response"
+                       Style="{StaticResource LabelStyle}"/>
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <TextBox x:Name="TxtResponse"
+                         Style="{StaticResource CodeBoxStyle}"
+                         FontFamily="Segoe UI"
+                         FontSize="12"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         BorderThickness="1"
+                         MinHeight="100"
+                         Text="Response will appear here…"/>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ── Status bar ── -->
+        <Border Grid.Row="7"
+                Margin="0,6,0,0"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                BorderThickness="0,1,0,0"
+                Padding="0,4,0,0">
+            <DockPanel>
+                <ProgressBar x:Name="ProgressBar"
+                             DockPanel.Dock="Right"
+                             Width="80"
+                             Height="6"
+                             IsIndeterminate="True"
+                             Visibility="Collapsed"
+                             Margin="8,0,0,0"/>
+                <TextBlock x:Name="TxtStatus"
+                           Text="Ready"
+                           FontSize="10"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

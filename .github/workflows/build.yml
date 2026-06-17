@@ -15,7 +15,6 @@ env:
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-  CACHE_BUST: "v3"
 
 jobs:
   build:
@@ -42,50 +41,47 @@ jobs:
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
-          path: ~/.nuget/packages
-          key: ${{ env.CACHE_BUST }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: ${{ env.CACHE_BUST }}-nuget-
+          path: |
+            ~/.nuget/packages
+            ${{ github.workspace }}\packages
+          key: nuget-v4-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v4-
 
-      - name: Restore NuGet packages
-        run: nuget restore ${{ env.SOLUTION_PATH }}
+      - name: Restore packages (nuget + msbuild)
+        shell: pwsh
+        run: |
+          # Pass 1: legacy nuget restore (handles VS SDK packages.config)
+          nuget restore ${{ env.SOLUTION_PATH }}
+          # Pass 2: msbuild restore (handles SDK-style PackageReference)
+          msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Debug /v:minimal
+          msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
 
       - name: Build Debug
         shell: pwsh
         run: |
-          $result = msbuild ${{ env.SOLUTION_PATH }} `
+          $output = msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
             /m /v:normal 2>&1
-          
-          # Always print errors and warnings regardless of exit code
-          $result | Where-Object { $_ -match "error CS|error MSB|warning CS|Build FAILED|Build succeeded" } |
-            ForEach-Object { Write-Host $_ }
-          
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "Full output around errors:"
-            $result | Where-Object { $_ -match "error|FAILED" } | ForEach-Object { Write-Host $_ }
-            exit $LASTEXITCODE
-          }
+          $output | ForEach-Object { Write-Host $_ }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run unit tests
         shell: pwsh
         run: |
-          $knownPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe"
-          if (-not (Test-Path $knownPath)) {
-            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-            $knownPath = & $vswhere -latest -products * -find "**\vstest.console.exe" 2>$null | Select-Object -First 1
+          $vstest = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe"
+          if (-not (Test-Path $vstest)) {
+            $vstest = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+              -latest -products * -find "**\vstest.console.exe" 2>$null | Select-Object -First 1
           }
-          Write-Host "vstest: $knownPath"
-
-          $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" -Filter "CodeLensAI.Tests.dll" -Recurse |
-                       Select-Object -First 1
+          Write-Host "vstest: $vstest"
+          $testDll = Get-ChildItem "CodeLensAI.Tests\bin\Debug" `
+            -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
           Write-Host "DLL: $($testDll.FullName)"
-
-          & $knownPath $testDll.FullName `
+          & $vstest $testDll.FullName `
             --logger:"trx;LogFileName=TestResults.trx" `
             --logger:"console;verbosity=detailed"
-
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload test results
@@ -156,7 +152,10 @@ jobs:
       - uses: NuGet/setup-nuget@v2
         with:
           nuget-version: '6.x'
-      - run: nuget restore ${{ env.SOLUTION_PATH }}
+      - shell: pwsh
+        run: |
+          nuget restore ${{ env.SOLUTION_PATH }}
+          msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
       - shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `

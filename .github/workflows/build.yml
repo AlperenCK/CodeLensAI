@@ -49,41 +49,7 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore ${{ env.SOLUTION_PATH }}
 
-      - name: Print build environment
-        shell: pwsh
-        run: |
-          Write-Host "=== MSBuild Version ==="
-          msbuild -version
-          Write-Host "=== .NET SDK ==="
-          dotnet --version
-          Write-Host "=== VS Install ==="
-          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationVersion
-
-      - name: Build Debug (errors only, no warnaserror for diagnostics)
-        shell: pwsh
-        run: |
-          Write-Host "=== Running diagnostic build (no warnaserror) ==="
-          msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Debug `
-            /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=false `
-            /m /v:normal `
-            2>&1 | Tee-Object -FilePath build-diag.log
-          
-          Write-Host ""
-          Write-Host "=== ALL WARNINGS AND ERRORS ==="
-          Select-String -Path build-diag.log -Pattern "warning CS|error CS|warning MSB|error MSB|Build FAILED|Build succeeded" |
-            ForEach-Object { Write-Host $_.Line }
-
-      - name: Upload diagnostic log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-diagnostic-log
-          path: build-diag.log
-          retention-days: 3
-
-      - name: Build Debug (strict - with warnaserror)
+      - name: Build Debug
         shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
@@ -92,17 +58,36 @@ jobs:
             /p:TreatWarningsAsErrors=true `
             /m /v:minimal
 
-      - name: Run unit tests
+      - name: Run unit tests (xUnit via MSBuild runner)
         shell: pwsh
         run: |
+          # Locate vstest.console.exe via vswhere
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vstest  = & $vswhere -latest -products * -find "**\vstest.console.exe" 2>$null |
+                       Select-Object -First 1
+
+          Write-Host "vstest path: $vstest"
+
           $testDll = Get-ChildItem `
-            -Path "CodeLensAI.Tests/bin/Debug" `
-            -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
-          if (-not $testDll) { Write-Error "Test DLL not found"; exit 1 }
-          
-          # Try dotnet test first (more reliable on CI)
-          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-build --configuration Debug `
-            --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
+            -Path "CodeLensAI.Tests\bin\Debug" `
+            -Filter "CodeLensAI.Tests.dll" -Recurse |
+            Select-Object -First 1
+
+          if (-not $testDll) {
+            Write-Error "CodeLensAI.Tests.dll not found under CodeLensAI.Tests\bin\Debug"
+            exit 1
+          }
+          Write-Host "Test DLL: $($testDll.FullName)"
+
+          & $vstest $testDll.FullName `
+            --logger:"trx;LogFileName=TestResults.trx" `
+            --logger:"console;verbosity=detailed"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unit tests FAILED (exit $LASTEXITCODE)"
+            exit $LASTEXITCODE
+          }
+          Write-Host "✅ All unit tests passed"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -171,7 +156,8 @@ jobs:
         with:
           nuget-version: '6.x'
       - run: nuget restore ${{ env.SOLUTION_PATH }}
-      - run: |
+      - shell: pwsh
+        run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Release `
             /p:DeployExtension=false `
@@ -186,7 +172,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: "CodeLens AI ${{ github.ref_name }}"
           body: |
-            Download and double-click the `.vsix` below to install.
+            Download and double-click `.vsix` to install.
             Requires Visual Studio 2022 (17.0+) and a local LLM server.
           files: ${{ steps.find_vsix.outputs.VSIX_PATH }}
           draft: false

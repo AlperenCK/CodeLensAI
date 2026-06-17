@@ -13,6 +13,7 @@ env:
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
   SOLUTION_PATH: CodeLensAI.sln
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
+  NEWTONSOFT_DLL: packages/Newtonsoft.Json.13.0.3/lib/net45/Newtonsoft.Json.dll
 
 jobs:
   build:
@@ -36,25 +37,34 @@ jobs:
 
       - name: Restore packages
         shell: pwsh
-        run: |
-          nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
-          Write-Host "=== packages folder ==="
-          Get-ChildItem ".\packages" -ErrorAction SilentlyContinue |
-            Select-Object Name | ForEach-Object { Write-Host $_.Name }
-          Write-Host "=== Newtonsoft DLL ==="
-          $dll = Get-ChildItem ".\packages" -Filter "Newtonsoft.Json.dll" -Recurse -ErrorAction SilentlyContinue
-          if ($dll) { Write-Host "FOUND: $($dll.FullName)" }
-          else { Write-Host "NOT FOUND — downloading manually..." }
+        run: nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
 
-      - name: Download Newtonsoft if missing
+      - name: Ensure Newtonsoft.Json at exact expected path
         shell: pwsh
         run: |
-          $dll = Get-ChildItem ".\packages" -Filter "Newtonsoft.Json.dll" -Recurse -ErrorAction SilentlyContinue
-          if (-not $dll) {
-            nuget install Newtonsoft.Json -Version 13.0.3 -OutputDirectory ".\packages\" -NonInteractive
+          $target = "${{ env.NEWTONSOFT_DLL }}"
+          if (Test-Path $target) {
+            Write-Host "Already present: $target"
+          } else {
+            Write-Host "Not found at $target — searching packages folder..."
+            $dll = Get-ChildItem ".\packages" -Filter "Newtonsoft.Json.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($dll) {
+              Write-Host "Found at: $($dll.FullName) — copying to expected path"
+              $dir = Split-Path $target -Parent
+              New-Item -ItemType Directory -Force -Path $dir | Out-Null
+              Copy-Item $dll.FullName $target
+              Write-Host "Copied OK"
+            } else {
+              Write-Host "Not in packages — downloading with nuget install"
+              nuget install Newtonsoft.Json -Version 13.0.3 -OutputDirectory ".\packages\" -NonInteractive
+              $dll2 = Get-ChildItem ".\packages" -Filter "Newtonsoft.Json.dll" -Recurse | Select-Object -First 1
+              $dir = Split-Path $target -Parent
+              New-Item -ItemType Directory -Force -Path $dir | Out-Null
+              Copy-Item $dll2.FullName $target
+              Write-Host "Copied OK: $target"
+            }
           }
-          $dll2 = Get-ChildItem ".\packages" -Filter "Newtonsoft.Json.dll" -Recurse -ErrorAction SilentlyContinue
-          Write-Host "DLL: $($dll2.FullName)"
+          Write-Host "Final check: $(Test-Path $target)"
 
       - name: Build Release VSIX
         shell: pwsh
@@ -100,7 +110,13 @@ jobs:
       - shell: pwsh
         run: |
           nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
-          nuget install Newtonsoft.Json -Version 13.0.3 -OutputDirectory ".\packages\" -NonInteractive
+          $target = "${{ env.NEWTONSOFT_DLL }}"
+          if (-not (Test-Path $target)) {
+            nuget install Newtonsoft.Json -Version 13.0.3 -OutputDirectory ".\packages\" -NonInteractive
+            $dll = Get-ChildItem ".\packages" -Filter "Newtonsoft.Json.dll" -Recurse | Select-Object -First 1
+            New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
+            Copy-Item $dll.FullName $target
+          }
       - shell: pwsh
         run: msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /v:minimal
       - id: find_vsix

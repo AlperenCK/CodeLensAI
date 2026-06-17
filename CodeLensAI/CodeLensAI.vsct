@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable"
+              xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <!--
+    CodeLens AI Command Table
+    Registers "Analyze with CodeLens AI" in:
+      1. Tools menu (top-level)
+      2. Editor context menu (right-click)
+  -->
+
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidCodeLensAIPackage">
+
+    <Groups>
+      <!-- Group inside Tools menu -->
+      <Group guid="guidCodeLensAICmdSet" id="MyMenuGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
+      </Group>
+
+      <!-- Group inside editor context menu -->
+      <Group guid="guidCodeLensAICmdSet" id="MyContextGroup" priority="0x0100">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_CODEWIN"/>
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <!-- Tools menu entry -->
+      <Button guid="guidCodeLensAICmdSet" id="AnalyzeCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidCodeLensAICmdSet" id="MyMenuGroup"/>
+        <Icon guid="guidImages" id="bmpPic1"/>
+        <Strings>
+          <ButtonText>Analyze with CodeLens AI</ButtonText>
+          <CommandName>CodeLensAI.Analyze</CommandName>
+          <ToolTipText>Send selected code to your local LLM for analysis</ToolTipText>
+        </Strings>
+      </Button>
+
+      <!-- Editor context menu entry -->
+      <Button guid="guidCodeLensAICmdSet" id="AnalyzeCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidCodeLensAICmdSet" id="MyContextGroup"/>
+        <Icon guid="guidImages" id="bmpPic1"/>
+        <Strings>
+          <ButtonText>CodeLens AI: Analyze Selection</ButtonText>
+          <CommandName>CodeLensAI.AnalyzeContext</CommandName>
+          <ToolTipText>Send selected code to your local LLM for analysis</ToolTipText>
+        </Strings>
+      </Button>
+    </Buttons>
+
+    <Bitmaps>
+      <Bitmap guid="guidImages"
+              href="Resources\icon.png"
+              usedList="bmpPic1"/>
+    </Bitmaps>
+
+  </Commands>
+
+  <Symbols>
+    <!-- Package GUID — must match VSPackage.PackageGuidString -->
+    <GuidSymbol name="guidCodeLensAIPackage"
+                value="{a1b2c3d4-e5f6-7890-abcd-ef1234567890}"/>
+
+    <!-- Command set GUID — must match AnalyzeCommand.CommandSet -->
+    <GuidSymbol name="guidCodeLensAICmdSet"
+                value="{b2c3d4e5-f6a7-8901-bcde-f12345678901}">
+      <IDSymbol name="MyMenuGroup"    value="0x1020"/>
+      <IDSymbol name="MyContextGroup" value="0x1021"/>
+      <IDSymbol name="AnalyzeCommandId" value="0x0100"/>
+    </GuidSymbol>
+
+    <GuidSymbol name="guidImages"
+                value="{d4e5f6a7-b8c9-0123-def0-123456789012}">
+      <IDSymbol name="bmpPic1" value="1"/>
+    </GuidSymbol>
+  </Symbols>
+
+</CommandTable>

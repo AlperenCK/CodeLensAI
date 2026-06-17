@@ -49,28 +49,48 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore ${{ env.SOLUTION_PATH }}
 
-      - name: Build (Debug) — verbose
+      - name: Print build environment
+        shell: pwsh
+        run: |
+          Write-Host "=== MSBuild Version ==="
+          msbuild -version
+          Write-Host "=== .NET SDK ==="
+          dotnet --version
+          Write-Host "=== VS Install ==="
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationVersion
+
+      - name: Build Debug (errors only, no warnaserror for diagnostics)
+        shell: pwsh
+        run: |
+          Write-Host "=== Running diagnostic build (no warnaserror) ==="
+          msbuild ${{ env.SOLUTION_PATH }} `
+            /p:Configuration=Debug `
+            /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=false `
+            /m /v:normal `
+            2>&1 | Tee-Object -FilePath build-diag.log
+          
+          Write-Host ""
+          Write-Host "=== ALL WARNINGS AND ERRORS ==="
+          Select-String -Path build-diag.log -Pattern "warning CS|error CS|warning MSB|error MSB|Build FAILED|Build succeeded" |
+            ForEach-Object { Write-Host $_.Line }
+
+      - name: Upload diagnostic log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-diagnostic-log
+          path: build-diag.log
+          retention-days: 3
+
+      - name: Build Debug (strict - with warnaserror)
         shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
-            /m /v:detailed `
-            2>&1 | Tee-Object -FilePath build-debug.log
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "=== BUILD ERRORS ==="
-            Select-String -Path build-debug.log -Pattern "error CS|error MSB|Build FAILED" | Select-Object -First 50
-            exit $LASTEXITCODE
-          }
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-debug-log
-          path: build-debug.log
-          retention-days: 7
+            /m /v:minimal
 
       - name: Run unit tests
         shell: pwsh
@@ -78,22 +98,11 @@ jobs:
           $testDll = Get-ChildItem `
             -Path "CodeLensAI.Tests/bin/Debug" `
             -Filter "CodeLensAI.Tests.dll" -Recurse | Select-Object -First 1
-          if (-not $testDll) {
-            Write-Error "Test DLL not found"
-            exit 1
-          }
-          $vstestPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\Extensions\TestPlatform\vstest.console.exe"
-          if (-not (Test-Path $vstestPath)) {
-            $vstestPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-              -latest -products * -requires Microsoft.VisualStudio.PackageGroup.TestTools.Core `
-              -find "**\vstest.console.exe" 2>$null | Select-Object -First 1
-          }
-          if (-not $vstestPath -or -not (Test-Path $vstestPath)) {
-            Write-Host "vstest.console.exe not found, using dotnet test fallback"
-            dotnet test ${{ env.TEST_PROJECT_PATH }} --no-build --configuration Debug --logger "trx;LogFileName=test-results.trx"
-          } else {
-            & $vstestPath $testDll.FullName --logger:"trx;LogFileName=test-results.trx" --logger:console
-          }
+          if (-not $testDll) { Write-Error "Test DLL not found"; exit 1 }
+          
+          # Try dotnet test first (more reliable on CI)
+          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-build --configuration Debug `
+            --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -103,7 +112,8 @@ jobs:
           path: "**/*.trx"
           retention-days: 30
 
-      - name: Build (Release)
+      - name: Build Release
+        shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Release `
@@ -115,11 +125,8 @@ jobs:
         shell: pwsh
         run: |
           $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
-          if ($vsix.Count -eq 0) {
-            Write-Error "No .vsix file found"
-            exit 1
-          }
-          Write-Host "✓ VSIX: $($vsix[0].Name) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
+          if ($vsix.Count -eq 0) { Write-Error "No .vsix file found"; exit 1 }
+          Write-Host "VSIX: $($vsix[0].Name) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
 
       - name: Run Roslyn analyzers
         shell: pwsh
@@ -156,45 +163,29 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
         with:
           vs-version: '[17.0,18.0)'
-
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
+      - uses: NuGet/setup-nuget@v2
         with:
           nuget-version: '6.x'
-
-      - name: Restore NuGet packages
-        run: nuget restore ${{ env.SOLUTION_PATH }}
-
-      - name: Build Release VSIX
-        run: |
+      - run: nuget restore ${{ env.SOLUTION_PATH }}
+      - run: |
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Release `
             /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true `
-            /m
-
-      - name: Find VSIX file
-        id: find_vsix
+            /p:TreatWarningsAsErrors=true /m
+      - id: find_vsix
         shell: pwsh
         run: |
           $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse | Select-Object -First 1
           echo "VSIX_PATH=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
-          echo "VSIX_NAME=$($vsix.Name)" >> $env:GITHUB_OUTPUT
-
-      - name: Create GitHub Release with VSIX
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "CodeLens AI ${{ github.ref_name }}"
           body: |
-            ## CodeLens AI ${{ github.ref_name }}
             Download and double-click the `.vsix` below to install.
             Requires Visual Studio 2022 (17.0+) and a local LLM server.
           files: ${{ steps.find_vsix.outputs.VSIX_PATH }}

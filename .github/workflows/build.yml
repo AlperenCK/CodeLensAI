@@ -37,28 +37,32 @@ jobs:
         with:
           nuget-version: '6.x'
 
-      - name: Restore packages (local packages folder — same as local build)
+      - name: Restore packages
         shell: pwsh
         run: |
           nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
+          Write-Host "packages folder contents:"
+          Get-ChildItem ".\packages" -ErrorAction SilentlyContinue | Select-Object Name
 
-      - name: Build Release VSIX
+      - name: Build Release VSIX (verbose)
         shell: pwsh
         run: |
-          msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /v:minimal
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $output = msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /v:normal 2>&1
+          $output | ForEach-Object { Write-Host $_ }
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "=== ERRORS ==="
+            $output | Where-Object { $_ -match "error |Error " } | ForEach-Object { Write-Host $_ }
+            exit $LASTEXITCODE
+          }
 
-      - name: Verify VSIX exists
+      - name: Verify VSIX
         shell: pwsh
         run: |
           $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
           if ($vsix.Count -eq 0) { Write-Error "VSIX not found!"; exit 1 }
           Write-Host "VSIX: $($vsix[0].Name) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
-
-          # Show VSIX contents for verification
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [System.IO.Compression.ZipFile]::OpenRead($vsix[0].FullName)
-          Write-Host "Contents:"
           $zip.Entries | ForEach-Object { Write-Host "  $($_.Name)" }
           $zip.Dispose()
 
@@ -75,63 +79,35 @@ jobs:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-2022
-
     permissions:
       contents: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
         with:
           vs-version: '[17.0,18.0)'
           msbuild-architecture: x64
-
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
+      - uses: NuGet/setup-nuget@v2
         with:
           nuget-version: '6.x'
-
-      - name: Restore packages
+      - shell: pwsh
+        run: nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
+      - shell: pwsh
+        run: msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /v:minimal
+      - id: find_vsix
         shell: pwsh
         run: |
-          nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
-
-      - name: Build Release VSIX
-        shell: pwsh
-        run: |
-          msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /v:minimal
-
-      - name: Find VSIX
-        id: find_vsix
-        shell: pwsh
-        run: |
-          $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse |
-            Select-Object -First 1
+          $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse | Select-Object -First 1
           echo "VSIX_PATH=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
-          echo "VSIX_NAME=$($vsix.Name)" >> $env:GITHUB_OUTPUT
-          Write-Host "VSIX: $($vsix.FullName)"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "CodeLens AI ${{ github.ref_name }}"
           body: |
             ## CodeLens AI ${{ github.ref_name }}
-
-            ### Kurulum
-            1. Aşağıdan `CodeLensAI.vsix` dosyasını indirin
-            2. Visual Studio 2022'yi **kapatın**
-            3. `CodeLensAI.vsix` dosyasına çift tıklayın
-            4. VS'yi yeniden açın → **Tools → Options → CodeLens AI** ile LLM'inizi yapılandırın
-
-            ### Gereksinimler
-            - Visual Studio 2022 (v17.0+)
-            - Visual Studio extension development workload
-            - Yerel LLM sunucusu (Ollama, LM Studio veya OpenAI-uyumlu API)
+            1. `CodeLensAI.vsix` dosyasını indirin
+            2. VS 2022'yi kapatın, çift tıklayın, yükleyin
+            3. **Tools → Options → CodeLens AI** ile LLM'inizi yapılandırın
           files: ${{ steps.find_vsix.outputs.VSIX_PATH }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

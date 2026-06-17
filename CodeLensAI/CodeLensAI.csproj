@@ -113,11 +113,12 @@
           Condition="'$(VSToolsPath)' != ''" />
 
   <Target Name="CopyNewtonsoftToOutput" AfterTargets="Build">
+    <!-- NuGetPackageRoot = %USERPROFILE%\.nuget\packages\ -->
     <Copy
-      SourceFiles="$(MSBuildThisFileDirectory)..\packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll"
+      SourceFiles="$(NuGetPackageRoot)newtonsoft.json\13.0.3\lib\net45\Newtonsoft.Json.dll"
       DestinationFolder="$(OutputPath)"
       SkipUnchangedFiles="true"
-      ContinueOnError="true" />
+      ContinueOnError="false" />
   </Target>
 
 </Project>

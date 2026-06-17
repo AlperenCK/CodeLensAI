@@ -135,10 +135,10 @@
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets"
           Condition="'$(VSToolsPath)' != ''" />
 
-  <!-- Build öncesi: packages klasörü yoksa nuget restore çalıştır -->
+  <!-- Build öncesi: packages klasörü yoksa sadece packages.config restore et -->
   <Target Name="RestoreNewtonsoftPackages" BeforeTargets="Build"
           Condition="!Exists('$(NewtonsoftPackagePath)')">
-    <Exec Command="&quot;$(USERPROFILE)\nuget.exe&quot; restore &quot;$(MSBuildThisFileDirectory)..\CodeLensAI.sln&quot; -PackagesDirectory &quot;$(MSBuildThisFileDirectory)..\packages\&quot;"
+    <Exec Command="&quot;$(USERPROFILE)\nuget.exe&quot; restore &quot;$(MSBuildThisFileDirectory)packages.config&quot; -PackagesDirectory &quot;$(MSBuildThisFileDirectory)..\packages\&quot; -SolutionDirectory &quot;$(MSBuildThisFileDirectory)..&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory).." />
   </Target>
 

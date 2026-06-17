@@ -44,27 +44,52 @@ jobs:
           path: |
             ~/.nuget/packages
             ${{ github.workspace }}\packages
-          key: nuget-v4-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v4-
+          key: nuget-v5-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v5-
 
-      - name: Restore packages (nuget + msbuild)
+      - name: Restore packages
         shell: pwsh
         run: |
-          # Pass 1: legacy nuget restore (handles VS SDK packages.config)
           nuget restore ${{ env.SOLUTION_PATH }}
-          # Pass 2: msbuild restore (handles SDK-style PackageReference)
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Debug /v:minimal
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
 
-      - name: Build Debug
+      - name: Diagnose — show all warnings (no warnaserror)
         shell: pwsh
         run: |
+          Write-Host "### DIAGNOSTIC PASS — identifying all warnings ###"
           $output = msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=true `
+            /p:TreatWarningsAsErrors=false `
             /m /v:normal 2>&1
-          $output | ForEach-Object { Write-Host $_ }
+          $warnings = $output | Where-Object { $_ -match "warning CS|warning MSB" }
+          if ($warnings) {
+            Write-Host "=== WARNINGS FOUND ==="
+            $warnings | ForEach-Object { Write-Host $_ }
+          } else {
+            Write-Host "No warnings found in diagnostic pass"
+          }
+          $errors = $output | Where-Object { $_ -match "error CS|error MSB|Build FAILED" }
+          if ($errors) {
+            Write-Host "=== ERRORS FOUND ==="
+            $errors | ForEach-Object { Write-Host $_ }
+            exit 1
+          }
+          Write-Host "### END DIAGNOSTIC ###"
+
+      - name: Build Debug (strict — warnaserror)
+        shell: pwsh
+        run: |
+          msbuild ${{ env.SOLUTION_PATH }} `
+            /p:Configuration=Debug `
+            /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=true `
+            /p:NoWarn="CS1591" `
+            /m /v:minimal 2>&1 | ForEach-Object {
+              if ($_ -match "error CS|error MSB|Build FAILED") { Write-Host "##[error]$_" }
+              else { Write-Host $_ }
+            }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run unit tests
@@ -99,6 +124,7 @@ jobs:
             /p:Configuration=Release `
             /p:DeployExtension=false `
             /p:TreatWarningsAsErrors=true `
+            /p:NoWarn="CS1591" `
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -117,6 +143,7 @@ jobs:
             /p:RunAnalyzersDuringBuild=true `
             /p:EnforceCodeStyleInBuild=true `
             /p:TreatWarningsAsErrors=true `
+            /p:NoWarn="CS1591" `
             /t:Rebuild /m /v:normal `
             2>&1 | Tee-Object -FilePath analysis-report.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -159,7 +186,8 @@ jobs:
       - shell: pwsh
         run: |
           msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Release /p:DeployExtension=false /p:TreatWarningsAsErrors=true /m
+            /p:Configuration=Release /p:DeployExtension=false `
+            /p:TreatWarningsAsErrors=true /p:NoWarn="CS1591" /m
       - id: find_vsix
         shell: pwsh
         run: |

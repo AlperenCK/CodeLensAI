@@ -12,6 +12,7 @@ on:
 env:
   SOLUTION_PATH: CodeLensAI.sln
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
+  TEST_PROJECT_PATH: CodeLensAI.Tests/CodeLensAI.Tests.csproj
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
   DOTNET_NOLOGO: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -42,8 +43,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-v12-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
-          restore-keys: nuget-v12-
+          key: nuget-v13-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: nuget-v13-
 
       - name: Restore packages
         shell: pwsh
@@ -52,52 +53,52 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Debug /v:minimal
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
 
-      - name: Build Debug
+      - name: Build solution (Debug)
         shell: pwsh
         run: |
           $output = msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Debug `
             /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=false `
             /m /v:normal 2>&1
-          # Surface all warnings and errors
-          $output | Where-Object { $_ -match "warning CS|warning MSB|error CS|error MSB|Build FAILED|Build succeeded" } |
+          $output | Where-Object { $_ -match "warning|error|FAILED|succeeded" } |
             ForEach-Object { Write-Host $_ }
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Build FAILED"
-            exit $LASTEXITCODE
-          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Run unit tests (dotnet vstest)
+      - name: Run unit tests
         shell: pwsh
         run: |
-          $testDll = Get-ChildItem "CodeLensAI.Tests" `
+          # Show what was built
+          Write-Host "=== Test project bin contents ==="
+          Get-ChildItem "CodeLensAI.Tests\bin" -Recurse -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host $_.FullName }
+
+          # Find the test DLL
+          $testDll = Get-ChildItem "CodeLensAI.Tests\bin" `
             -Filter "CodeLensAI.Tests.dll" -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match "Debug" } |
             Select-Object -First 1
 
           if (-not $testDll) {
-            Write-Host "Listing CodeLensAI.Tests:"
-            Get-ChildItem "CodeLensAI.Tests" -Recurse -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -like "*.dll" } | ForEach-Object { Write-Host $_.FullName }
-            Write-Error "Test DLL not found"
+            Write-Error "Test DLL not found after build"
             exit 1
           }
-          Write-Host "DLL: $($testDll.FullName)"
+          Write-Host "Test DLL: $($testDll.FullName)"
 
-          dotnet vstest $testDll.FullName `
-            --logger:"trx;LogFileName=TestResults.trx" `
+          # Run with dotnet vstest
+          dotnet vstest "$($testDll.FullName)" `
+            --logger:"trx;LogFileName=${{ github.workspace }}\TestResults.trx" `
             --logger:"console;verbosity=detailed"
 
-          if ($LASTEXITCODE -ne 0) { Write-Error "Tests FAILED"; exit $LASTEXITCODE }
-          Write-Host "All tests passed"
+          $exit = $LASTEXITCODE
+          Write-Host "dotnet vstest exit code: $exit"
+          if ($exit -ne 0) { exit $exit }
+          Write-Host "✅ All tests passed"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: "**/*.trx"
+          path: "*.trx"
           retention-days: 30
 
       - name: Build Release
@@ -106,11 +107,10 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} `
             /p:Configuration=Release `
             /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=false `
             /m /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Verify VSIX artifact exists
+      - name: Verify VSIX
         shell: pwsh
         run: |
           $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
@@ -124,7 +124,6 @@ jobs:
             /p:Configuration=Release `
             /p:RunAnalyzersDuringBuild=true `
             /p:EnforceCodeStyleInBuild=true `
-            /p:TreatWarningsAsErrors=false `
             /t:Rebuild /m /v:normal `
             2>&1 | Tee-Object -FilePath analysis-report.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -166,9 +165,7 @@ jobs:
           msbuild ${{ env.SOLUTION_PATH }} /t:Restore /p:Configuration=Release /v:minimal
       - shell: pwsh
         run: |
-          msbuild ${{ env.SOLUTION_PATH }} `
-            /p:Configuration=Release /p:DeployExtension=false `
-            /p:TreatWarningsAsErrors=false /m
+          msbuild ${{ env.SOLUTION_PATH }} /p:Configuration=Release /p:DeployExtension=false /m
       - id: find_vsix
         shell: pwsh
         run: |

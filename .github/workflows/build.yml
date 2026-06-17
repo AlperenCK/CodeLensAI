@@ -10,10 +10,9 @@ on:
   workflow_dispatch:
 
 env:
-  SOLUTION_PATH: CodeLensAI.sln
   PROJECT_PATH: CodeLensAI/CodeLensAI.csproj
+  SOLUTION_PATH: CodeLensAI.sln
   VSIX_OUTPUT_DIR: CodeLensAI/bin/Release
-  DOTNET_NOLOGO: true
 
 jobs:
   build:
@@ -23,10 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Setup MSBuild (VS 2022)
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
         with:
           vs-version: '[17.0,18.0)'
@@ -39,28 +36,20 @@ jobs:
 
       - name: Restore packages
         shell: pwsh
-        run: |
-          nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
-          Write-Host "packages folder contents:"
-          Get-ChildItem ".\packages" -ErrorAction SilentlyContinue | Select-Object Name
+        run: nuget restore -PackagesDirectory ".\packages\" ${{ env.SOLUTION_PATH }}
 
-      - name: Build Release VSIX (verbose)
+      - name: Build Release VSIX
         shell: pwsh
         run: |
-          $output = msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /v:normal 2>&1
-          $output | ForEach-Object { Write-Host $_ }
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "=== ERRORS ==="
-            $output | Where-Object { $_ -match "error |Error " } | ForEach-Object { Write-Host $_ }
-            exit $LASTEXITCODE
-          }
+          msbuild ${{ env.PROJECT_PATH }} /p:Configuration=Release /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify VSIX
         shell: pwsh
         run: |
-          $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
-          if ($vsix.Count -eq 0) { Write-Error "VSIX not found!"; exit 1 }
-          Write-Host "VSIX: $($vsix[0].Name) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
+          $vsix = Get-ChildItem "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse
+          if ($vsix.Count -eq 0) { Write-Error "VSIX not found"; exit 1 }
+          Write-Host "OK: $($vsix[0].Name) ($([math]::Round($vsix[0].Length/1KB,1)) KB)"
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [System.IO.Compression.ZipFile]::OpenRead($vsix[0].FullName)
           $zip.Entries | ForEach-Object { Write-Host "  $($_.Name)" }
@@ -97,7 +86,7 @@ jobs:
       - id: find_vsix
         shell: pwsh
         run: |
-          $vsix = Get-ChildItem -Path "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse | Select-Object -First 1
+          $vsix = Get-ChildItem "${{ env.VSIX_OUTPUT_DIR }}" -Filter "*.vsix" -Recurse | Select-Object -First 1
           echo "VSIX_PATH=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
       - uses: softprops/action-gh-release@v2
         with:
@@ -106,8 +95,9 @@ jobs:
           body: |
             ## CodeLens AI ${{ github.ref_name }}
             1. `CodeLensAI.vsix` dosyasını indirin
-            2. VS 2022'yi kapatın, çift tıklayın, yükleyin
-            3. **Tools → Options → CodeLens AI** ile LLM'inizi yapılandırın
+            2. Visual Studio 2022'yi kapatın
+            3. Çift tıklayıp yükleyin
+            4. **Tools → Options → CodeLens AI** ile LLM'inizi yapılandırın
           files: ${{ steps.find_vsix.outputs.VSIX_PATH }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

@@ -6,6 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using CodeLensAI.Services;
+#nullable disable
 
 namespace CodeLensAI.ToolWindows
 {
@@ -143,7 +144,7 @@ namespace CodeLensAI.ToolWindows
             try
             {
                 var result = await _host
-                    .AnalyzeAsync(codeCopy, message, token)
+                    .AnalyzeAsync(codeCopy, message!, token)
                     .ConfigureAwait(true);
 
                 if (result.Success)

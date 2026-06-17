@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>CodeLensAI.Tests</RootNamespace>
+    <AssemblyName>CodeLensAI.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <!-- Tests should not treat warnings as errors during rapid iteration -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xUnit 2.4.x — last version with solid net472 support -->
+    <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
+    <!-- Moq for HttpMessageHandler mocking -->
+    <PackageReference Include="Moq" Version="4.20.69" />
+    <!-- Newtonsoft for test data construction -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference the main project (no VS SDK needed for pure logic tests) -->
+    <ProjectReference Include="..\CodeLensAI\CodeLensAI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="LlmOptionsTests.cs" />
+    <Compile Include="LlmServiceTests.cs" />
+    <Compile Include="ChatMessageTests.cs" />
+  </ItemGroup>
+
+</Project>

@@ -4,11 +4,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="600"
-             d:DesignWidth="400"
+             d:DesignHeight="600" d:DesignWidth="400"
              Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
 
     <UserControl.Resources>
+
+        <!-- Converters -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
         <Style x:Key="HeaderTextStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -20,6 +23,28 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+
+        <!-- Shared placeholder style for the overlay TextBlock -->
+        <Style x:Key="PlaceholderStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
+            <Setter Property="Margin" Value="8,6,8,0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="FontStyle" Value="Italic"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <Style x:Key="CodeBoxStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Courier New"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
 
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
@@ -50,36 +75,18 @@
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
-        <Style x:Key="CodeBoxStyle" TargetType="TextBox">
-            <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Courier New"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"/>
-            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"/>
-            <Setter Property="Padding" Value="6"/>
-            <Setter Property="AcceptsReturn" Value="True"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
-        </Style>
     </UserControl.Resources>
 
     <Grid Margin="8">
         <Grid.RowDefinitions>
-            <!-- Header -->
-            <RowDefinition Height="Auto"/>
-            <!-- Code section -->
-            <RowDefinition Height="120"/>
-            <!-- Message input -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="80"/>
-            <!-- Action buttons -->
-            <RowDefinition Height="Auto"/>
-            <!-- Separator -->
-            <RowDefinition Height="Auto"/>
-            <!-- Response -->
-            <RowDefinition Height="*"/>
-            <!-- Status bar -->
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>   <!-- Header -->
+            <RowDefinition Height="120"/>    <!-- Code box -->
+            <RowDefinition Height="Auto"/>   <!-- Message label -->
+            <RowDefinition Height="80"/>     <!-- Message input -->
+            <RowDefinition Height="Auto"/>   <!-- Buttons -->
+            <RowDefinition Height="Auto"/>   <!-- Separator -->
+            <RowDefinition Height="*"/>      <!-- Response -->
+            <RowDefinition Height="Auto"/>   <!-- Status -->
         </Grid.RowDefinitions>
 
         <!-- ── Header ── -->
@@ -89,28 +96,33 @@
                        VerticalAlignment="Center" FontSize="16"/>
         </StackPanel>
 
-        <!-- ── Selected Code ── -->
+        <!-- ── Selected Code (with overlay placeholder) ── -->
         <Grid Grid.Row="1" Margin="0,0,0,6">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
+
             <DockPanel Grid.Row="0" LastChildFill="False">
-                <TextBlock DockPanel.Dock="Left"
-                           Text="Selected Code" Style="{StaticResource LabelStyle}"/>
-                <Button x:Name="BtnClearCode"
-                        DockPanel.Dock="Right"
+                <TextBlock DockPanel.Dock="Left" Text="Selected Code"
+                           Style="{StaticResource LabelStyle}"/>
+                <Button x:Name="BtnClearCode" DockPanel.Dock="Right"
                         Content="Clear"
                         Style="{StaticResource SecondaryButtonStyle}"
-                        Padding="6,2"
-                        FontSize="10"
+                        Padding="6,2" FontSize="10"
                         Click="BtnClearCode_Click"/>
             </DockPanel>
-            <TextBox x:Name="TxtSelectedCode"
-                     Grid.Row="1"
-                     Style="{StaticResource CodeBoxStyle}"
-                     IsReadOnly="False"
-                     PlaceholderText="Paste or select code here…"/>
+
+            <!-- Overlay placeholder — visible only when TextBox is empty -->
+            <Grid Grid.Row="1">
+                <TextBox x:Name="TxtSelectedCode"
+                         Style="{StaticResource CodeBoxStyle}"
+                         TextChanged="TxtSelectedCode_TextChanged"/>
+                <TextBlock x:Name="PhSelectedCode"
+                           Style="{StaticResource PlaceholderStyle}"
+                           Text="Paste or select code here…"
+                           Visibility="Visible"/>
+            </Grid>
         </Grid>
 
         <!-- ── Message label ── -->
@@ -118,15 +130,19 @@
                    Text="Your question or instruction"
                    Style="{StaticResource LabelStyle}"/>
 
-        <!-- ── User message input ── -->
-        <TextBox x:Name="TxtUserMessage"
-                 Grid.Row="3"
-                 Style="{StaticResource CodeBoxStyle}"
-                 FontFamily="Segoe UI"
-                 FontSize="12"
-                 PlaceholderText="e.g. What does this code do? Fix the bug. Refactor for readability…"
-                 Margin="0,0,0,6"
-                 KeyDown="TxtUserMessage_KeyDown"/>
+        <!-- ── User message input (with overlay placeholder) ── -->
+        <Grid Grid.Row="3" Margin="0,0,0,6">
+            <TextBox x:Name="TxtUserMessage"
+                     Style="{StaticResource CodeBoxStyle}"
+                     FontFamily="Segoe UI" FontSize="12"
+                     KeyDown="TxtUserMessage_KeyDown"
+                     TextChanged="TxtUserMessage_TextChanged"/>
+            <TextBlock x:Name="PhUserMessage"
+                       Style="{StaticResource PlaceholderStyle}"
+                       Text="e.g. What does this do? Fix the bug. Add unit tests… (Ctrl+Enter to send)"
+                       Visibility="Visible"
+                       TextWrapping="Wrap"/>
+        </Grid>
 
         <!-- ── Action buttons ── -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,8">
@@ -156,28 +172,29 @@
         <!-- ── Separator ── -->
         <Separator Grid.Row="5" Margin="0,0,0,8"/>
 
-        <!-- ── Response area ── -->
+        <!-- ── Response area (with overlay placeholder) ── -->
         <Grid Grid.Row="6">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0"
-                       Text="Response"
-                       Style="{StaticResource LabelStyle}"/>
-            <ScrollViewer Grid.Row="1"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
-                <TextBox x:Name="TxtResponse"
-                         Style="{StaticResource CodeBoxStyle}"
-                         FontFamily="Segoe UI"
-                         FontSize="12"
-                         IsReadOnly="True"
-                         TextWrapping="Wrap"
-                         BorderThickness="1"
-                         MinHeight="100"
-                         Text="Response will appear here…"/>
-            </ScrollViewer>
+            <TextBlock Grid.Row="0" Text="Response" Style="{StaticResource LabelStyle}"/>
+            <Grid Grid.Row="1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBox x:Name="TxtResponse"
+                             Style="{StaticResource CodeBoxStyle}"
+                             FontFamily="Segoe UI" FontSize="12"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             BorderThickness="1"
+                             MinHeight="100"/>
+                </ScrollViewer>
+                <TextBlock x:Name="PhResponse"
+                           Style="{StaticResource PlaceholderStyle}"
+                           Text="Response will appear here…"
+                           Visibility="Visible"/>
+            </Grid>
         </Grid>
 
         <!-- ── Status bar ── -->
@@ -189,8 +206,7 @@
             <DockPanel>
                 <ProgressBar x:Name="ProgressBar"
                              DockPanel.Dock="Right"
-                             Width="80"
-                             Height="6"
+                             Width="80" Height="6"
                              IsIndeterminate="True"
                              Visibility="Collapsed"
                              Margin="8,0,0,0"/>

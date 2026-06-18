@@ -45,13 +45,16 @@ namespace CodeLensAI.ToolWindows
             ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
-                var dte = Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE80.DTE2;
-                dte?.ExecuteCommand("Tools.Options", "CodeLens AI");
+                // DTE ile Tools.Options ac
+                var dte = Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+                if (dte != null)
+                {
+                    dte.ExecuteCommand("Tools.Options", "");
+                    return;
+                }
             }
-            catch
-            {
-                AppendErrorBubble("Ayarlar icin: Tools -> Options -> CodeLens AI -> LLM Connection");
-            }
+            catch { }
+            AppendErrorBubble("Ayarlar: Tools -> Options -> CodeLens AI -> LLM Connection");
         }
 
         private void BtnClearAll_Click(object sender, RoutedEventArgs e)

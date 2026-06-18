@@ -13,7 +13,7 @@ namespace CodeLensAI.Options
         private string _endpointUrl = "http://localhost:11434/v1";
         private string _modelName = "codellama";
         private string _apiKey = string.Empty;
-        private int _maxTokens = 2048;
+        private int _maxTokens = 4096;
         private double _temperature = 0.2;
         private int _timeoutSeconds = 60;
 
@@ -80,7 +80,7 @@ namespace CodeLensAI.Options
         public int MaxTokens
         {
             get => _maxTokens;
-            set => _maxTokens = value < 64 ? 64 : value > 8192 ? 8192 : value;
+            set => _maxTokens = value < 64 ? 64 : value > 32768 ? 32768 : value;
         }
 
         /// <summary>Temperature controlling response creativity (0.0–1.0).</summary>

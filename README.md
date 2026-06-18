@@ -106,22 +106,22 @@ API Key      : sk-xxxx  (sk- ile başlamalı)
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  ● CodeLens AI        [gpt-oss-120b ▾]  ⚙  ↺   │  ← Model dropdown + ayar
+│  ● CodeLens AI        [gpt-oss-120b ▾]  ⚙  ↺    │  ← Model dropdown + ayar
 ├──────────────────────────────────────────────────┤
 │                                                  │
-│  ┌──────────────────────────────────────────┐   │
-│  │ public int Add(int a, int b) {  (4 satır)│   │  ← Kod önizleme
-│  └──────────────────────────────────────────┘   │
-│                       Bu kodda hata var mı?  ●  │  ← Kullanıcı mesajı
+│  ┌──────────────────────────────────────────┐    │
+│  │ public int Add(int a, int b) {  (4 satır)│    │  ← Kod önizleme
+│  └──────────────────────────────────────────┘    │
+│                       Bu kodda hata var mı?  ●   │  ← Kullanıcı mesajı
 │                                                  │
-│  ● ─────────────────────────────────────────    │
+│  ● ─────────────────────────────────────────     │
 │    Evet — return a - b yerine a + b olmali.      │  ← AI yanıtı
 │                                    [Kopyala]     │
-│  ─────────────────────────────────────────────  │
+│  ─────────────────────────────────────────────   │
 │  Model degistirildi: gpt-oss:20b  (italik)       │  ← Bilgi mesajı
 │                                                  │
 ├──────────────────────────────────────────────────┤
-│  Sorunuzu yazin… (Enter)                  [↑]   │
+│  Sorunuzu yazin… (Enter)                  [↑]    │
 └──────────────────────────────────────────────────┘
 ```
 

@@ -78,22 +78,66 @@ namespace CodeLensAI.ToolWindows
             try
             {
                 var opts = _host?.GetOptions();
-                if (opts == null || string.IsNullOrWhiteSpace(opts.ModelProfiles)) return;
+                if (opts == null) return;
 
-                var profiles = opts.ModelProfiles.Split(
-                    new[] { '\n', '\r', ';', ',' },
-                    StringSplitOptions.RemoveEmptyEntries);
+                var profiles = string.IsNullOrWhiteSpace(opts.ModelProfiles)
+                    ? new string[0]
+                    : opts.ModelProfiles.Split(
+                        new[] { '\n', '\r', ';', ',' },
+                        StringSplitOptions.RemoveEmptyEntries);
 
-                if (profiles.Length <= 1) return;
-
+                // Build ContextMenu dynamically
+                var menu = new System.Windows.Controls.ContextMenu();
                 var current = opts.ModelName?.Trim() ?? string.Empty;
-                int idx = Array.FindIndex(profiles, p => p.Trim() == current);
-                var next = profiles[(idx + 1) % profiles.Length].Trim();
 
-                opts.ModelName = next;
-                opts.SaveSettingsToStorage();
-                RefreshModelName();
-                AppendErrorBubble("Model: " + next);
+                // Add current model if not in profiles
+                if (!string.IsNullOrWhiteSpace(current) &&
+                    System.Array.FindIndex(profiles, p => p.Trim() == current) < 0)
+                {
+                    var item0 = new System.Windows.Controls.MenuItem
+                    {
+                        Header = current + " (aktif)",
+                        IsChecked = true,
+                        IsCheckable = false
+                    };
+                    menu.Items.Add(item0);
+                    if (profiles.Length > 0)
+                        menu.Items.Add(new System.Windows.Controls.Separator());
+                }
+
+                foreach (var profile in profiles)
+                {
+                    var p = profile.Trim();
+                    if (string.IsNullOrEmpty(p)) continue;
+                    var item = new System.Windows.Controls.MenuItem
+                    {
+                        Header = p,
+                        IsChecked = p == current,
+                        IsCheckable = false
+                    };
+                    var captured = p;
+                    item.Click += (s, args) =>
+                    {
+                        opts.ModelName = captured;
+                        opts.SaveSettingsToStorage();
+                        RefreshModelName();
+                        AppendInfoBubble("Model degistirildi: " + captured);
+                    };
+                    menu.Items.Add(item);
+                }
+
+                if (menu.Items.Count == 0)
+                {
+                    AppendInfoBubble("Model profili tanimlanmamis. Tools -> Options -> CodeLens AI -> Model Profiles");
+                    return;
+                }
+
+                if (sender is System.Windows.Controls.Button btn)
+                {
+                    menu.PlacementTarget = btn;
+                    menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                    menu.IsOpen = true;
+                }
             }
             catch { }
         }
@@ -315,6 +359,30 @@ namespace CodeLensAI.ToolWindows
             inner.Children.Add(tb);
             inner.Children.Add(copyBtn);
             border.Child = inner;
+            ChatPanel.Children.Add(border);
+            ScrollToBottom();
+        }
+
+        private void AppendInfoBubble(string message)
+        {
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(10, 7, 10, 7),
+                MaxWidth = 280,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 2, 32, 8),
+                BorderThickness = new Thickness(1)
+            };
+            border.SetResourceReference(Border.BackgroundProperty, SystemColors.ControlBrushKey);
+            border.SetResourceReference(Border.BorderBrushProperty, SystemColors.ActiveBorderBrushKey);
+            border.Child = new TextBlock
+            {
+                Text = message,
+                FontSize = 11,
+                FontStyle = FontStyles.Italic,
+                TextWrapping = TextWrapping.Wrap
+            };
             ChatPanel.Children.Add(border);
             ScrollToBottom();
         }

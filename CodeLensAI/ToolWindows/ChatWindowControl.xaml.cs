@@ -81,7 +81,7 @@ namespace CodeLensAI.ToolWindows
                 if (opts == null || string.IsNullOrWhiteSpace(opts.ModelProfiles)) return;
 
                 var profiles = opts.ModelProfiles.Split(
-                    new[] { '\n', '\r', ';' },
+                    new[] { '\n', '\r', ';', ',' },
                     StringSplitOptions.RemoveEmptyEntries);
 
                 if (profiles.Length <= 1) return;

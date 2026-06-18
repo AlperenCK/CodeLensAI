@@ -135,14 +135,23 @@
 
                 <!-- Right side: model pill + settings -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Border Style="{StaticResource ModelPillStyle}" Margin="0,0,6,0">
-                        <TextBlock x:Name="TxtModelName"
-                                   Text="—"
-                                   FontSize="10"
-                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
-                                   TextTrimming="CharacterEllipsis"
-                                   MaxWidth="100"/>
-                    </Border>
+                    <Button x:Name="BtnModelPill"
+                            Click="BtnModelPill_Click"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="0"
+                            Cursor="Hand"
+                            ToolTip="Model degistir (birden fazla profil tanimlanmissa)"
+                            Margin="0,0,6,0">
+                        <Border Style="{StaticResource ModelPillStyle}">
+                            <TextBlock x:Name="TxtModelName"
+                                       Text="—"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="120"/>
+                        </Border>
+                    </Button>
                     <Button x:Name="BtnSettings"
                             Style="{StaticResource IconButtonStyle}"
                             ToolTip="LLM Settings (Tools → Options → CodeLens AI)"

@@ -64,9 +64,10 @@ namespace CodeLensAI.Options
         [Category("Models")]
         [DisplayName("Model Profiles")]
         [Description(
-            "Define multiple model names, one per line (or semicolon-separated). " +
-            "Click the model pill in the chat panel to cycle through them quickly. " +
-            "Example: codellama\ndeepseek-coder:6.7b\nqwen2.5-coder:7b")]
+            "Define multiple model names separated by newline, semicolon, or comma. " +
+            "Colon (:) is NOT a separator (model names may contain it). " +
+            "Click the model pill to cycle through profiles. " +
+            "Example: gpt-oss-120b;gpt-oss:20b  or one per line")]
         public string ModelProfiles
         {
             get => _modelProfiles;

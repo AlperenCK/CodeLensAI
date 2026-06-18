@@ -22,7 +22,7 @@ Kodunuzu buluta göndermeden, kendi LLM'inizle analiz edin.
 Visual Studio 2022'ye entegre olan CodeLens AI, editördeki seçili kodu alıp yerel LLM'inize göndererek anında analiz, hata tespiti, refactoring önerileri ve açıklama üretir — **internet bağlantısı ve bulut servisi gerekmez.**
 
 ```
-Kodu seç  →  Soruyu yaz  →  Analiz Et  →  Yanıtı al
+Kodu seç  →  Soruyu yaz  →  Enter  →  Yanıtı al
 ```
 
 ---
@@ -54,11 +54,12 @@ Kodu seç  →  Soruyu yaz  →  Analiz Et  →  Yanıtı al
 | Alan | Açıklama | Örnek |
 |---|---|---|
 | Endpoint URL | LLM sunucunuzun base URL'i (`/chat/completions` **eklemeyin**) | `http://localhost:11434/v1` |
-| Model Name | Kullanmak istediğiniz model adı | `codellama`, `qwen2.5-coder:7b` |
+| Model Name | Aktif model adı | `codellama`, `qwen2.5-coder:7b` |
 | API Key | Varsa API anahtarı, yoksa boş bırakın | `sk-xxxx` veya boş |
-| Max Tokens | Maksimum token sayısı | `2048` |
-| Temperature | Yanıt yaratıcılığı (0.0–1.0, kod için düşük önerilir) | `0.2` |
+| Max Tokens | Maksimum token sayısı (default: 4096) | `4096` |
+| Temperature | Yanıt yaratıcılığı (0.0–1.0) | `0.2` |
 | Timeout | HTTP istek zaman aşımı (saniye) | `60` |
+| **Model Profiles** | Birden fazla model tanımlama — `;` veya her satıra bir model | `gpt-oss-120b;gpt-oss:20b` |
 
 ### Popüler LLM Yapılandırmaları
 
@@ -67,11 +68,10 @@ Kodu seç  →  Soruyu yaz  →  Analiz Et  →  Yanıtı al
 
 ```
 Endpoint URL : http://localhost:11434/v1
-Model Name   : codellama          (veya: llama3, deepseek-coder, qwen2.5-coder:7b)
+Model Name   : codellama
 API Key      : (boş)
 ```
 
-Ollama'da model yüklemek için:
 ```bash
 ollama pull codellama
 ollama pull qwen2.5-coder:7b
@@ -86,8 +86,6 @@ Endpoint URL : http://localhost:1234/v1
 Model Name   : (LM Studio'da yüklü modelin adı)
 API Key      : (boş)
 ```
-
-LM Studio'da: **Local Server** sekmesine geçip sunucuyu başlatın.
 </details>
 
 <details>
@@ -95,8 +93,8 @@ LM Studio'da: **Local Server** sekmesine geçip sunucuyu başlatın.
 
 ```
 Endpoint URL : https://your-litellm-server/v1
-Model Name   : Qwen3-Coder-30B-A3B-Instruct  (veya proxy'deki model adı)
-API Key      : sk-xxxx  (LiteLLM virtual key — sk- ile başlamalı)
+Model Name   : Qwen3-Coder-30B-A3B-Instruct
+API Key      : sk-xxxx  (sk- ile başlamalı)
 ```
 </details>
 
@@ -104,49 +102,49 @@ API Key      : sk-xxxx  (LiteLLM virtual key — sk- ile başlamalı)
 
 ## 📖 Kullanım
 
-### Arayüz
-
-v1.6.0 ile birlikte CodeLens AI modern bir **sohbet baloncuğu arayüzüne** kavuştu:
+### Arayüz (v1.7.0)
 
 ```
-┌─────────────────────────────────────────────┐
-│  ● CodeLens AI          qwen3-coder  ⚙  ↺  │
-├─────────────────────────────────────────────┤
-│                                             │
-│         ●                                   │
-│     CodeLens AI                             │
-│   Kodu seçin, sorunuzu yazın.               │
-│                                             │
-│  ┌──────────────────────────────────────┐   │
-│  │ public int Add(int a, int b) {       │   │  ← Kod önizleme
-│  │   return a - b; // bug               │   │
-│  └──────────────────────────────────────┘   │
-│                       Bu kodda hata var mı? │  ← Kullanıcı
-│                                             │
-│  ┌──────────────────────────────────────┐   │
-│  │ Evet — `a - b` yerine `a + b` olmalı │   │  ← AI yanıtı
-│  │                          [Kopyala]   │   │
-│  └──────────────────────────────────────┘   │
-│                                             │
-├─────────────────────────────────────────────┤
-│  Sorunuzu yazın… (Ctrl+Enter)     [↑]       │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  ● CodeLens AI        [gpt-oss-120b ▾]  ⚙  ↺   │  ← Model dropdown + ayar
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  ┌──────────────────────────────────────────┐   │
+│  │ public int Add(int a, int b) {  (4 satır)│   │  ← Kod önizleme
+│  └──────────────────────────────────────────┘   │
+│                       Bu kodda hata var mı?  ●  │  ← Kullanıcı mesajı
+│                                                  │
+│  ● ─────────────────────────────────────────    │
+│    Evet — return a - b yerine a + b olmali.      │  ← AI yanıtı
+│                                    [Kopyala]     │
+│  ─────────────────────────────────────────────  │
+│  Model degistirildi: gpt-oss:20b  (italik)       │  ← Bilgi mesajı
+│                                                  │
+├──────────────────────────────────────────────────┤
+│  Sorunuzu yazin… (Enter)                  [↑]   │
+└──────────────────────────────────────────────────┘
 ```
 
 ### Yöntem 1 — Sağ Tık (Önerilen)
 
-1. Editörde analiz etmek istediğiniz kodu **seçin**
+1. Editörde kodu **seçin**
 2. Sağ tıklayın → **CodeLens AI: Analyze Selection**
-3. Kod önizleme balonu otomatik dolar
-4. Sorunuzu yazın → `Ctrl+Enter` veya `↑`
+3. Kod önizleme otomatik yüklenir (ilk satır + satır sayısı gösterilir)
+4. Sorunuzu yazın → **Enter** (ya da `↑` butonu)
 
 ### Yöntem 2 — Tools Menüsü
 
 **Tools → Analyze with CodeLens AI**
 
-### Yöntem 3 — Manuel
+### Model Değiştirme
 
-Paneli açın, sorunuzu doğrudan yazın (kod olmadan da kullanabilirsiniz).
+1. **Tools → Options → CodeLens AI → Model Profiles** alanına modelleri tanımlayın:
+   ```
+   gpt-oss-120b
+   gpt-oss:20b
+   qwen2.5-coder:7b
+   ```
+2. Panel başlığındaki **model adı butonuna** tıklayın → dropdown açılır → istediğiniz modeli seçin
 
 ---
 
@@ -168,20 +166,21 @@ Paneli açın, sorunuzu doğrudan yazın (kod olmadan da kullanabilirsiniz).
 
 ```
 CodeLensAI/
-├── VSPackage.cs                    # AsyncPackage giriş noktası
+├── Version.props                       # Tüm versiyon numaraları tek yerden
+├── VSPackage.cs                        # AsyncPackage giriş noktası
 ├── Commands/
-│   └── AnalyzeCommand.cs           # Editör komutu — seçili metni alır
+│   └── AnalyzeCommand.cs               # Editör komutu — seçili metni alır
 ├── ToolWindows/
-│   ├── ChatWindow.cs               # ToolWindowPane wrapper
-│   ├── ChatWindowControl.xaml      # WPF sohbet arayüzü (v1.6.0)
-│   └── ChatWindowControl.xaml.cs  # UI logic + async LLM çağrısı
+│   ├── ChatWindow.cs                   # ToolWindowPane wrapper
+│   ├── ChatWindowControl.xaml          # WPF sohbet arayüzü
+│   └── ChatWindowControl.xaml.cs       # UI logic — dropdown, bubbles, async send
 ├── Options/
-│   └── LlmOptions.cs               # VS Settings Store kalıcı ayarlar
+│   └── LlmOptions.cs                   # VS Settings Store — ModelProfiles dahil
 ├── Services/
-│   ├── ILlmHost.cs                 # Arayüz (test edilebilirlik)
-│   └── LlmService.cs               # HTTP istemcisi → /v1/chat/completions
+│   ├── ILlmHost.cs                     # Arayüz
+│   └── LlmService.cs                   # HTTP → /v1/chat/completions
 └── Models/
-    └── ChatMessage.cs              # Request/response modelleri
+    └── ChatMessage.cs                  # DataContractJsonSerializer modelleri
 ```
 
 ---
@@ -191,14 +190,17 @@ CodeLensAI/
 ```powershell
 git clone https://github.com/AlperenCK/CodeLensAI.git
 cd CodeLensAI
-nuget restore -PackagesDirectory ".\packages\" CodeLensAI.sln
+
+# Newtonsoft.Json'ı packages klasörüne indir
+& "$env:USERPROFILE\nuget.exe" restore "CodeLensAI\packages.config" -PackagesDirectory ".\packages\" -SolutionDirectory "."
+
+# Build
 msbuild CodeLensAI\CodeLensAI.csproj /p:Configuration=Release /v:minimal
+
 # Çıktı: CodeLensAI\bin\Release\CodeLensAI.vsix
 ```
 
-**Gereksinimler:**
-- Visual Studio 2022 (Visual Studio extension development workload)
-- NuGet CLI
+> **Not:** VS 2022 içinden F5/Build yaparsanız `packages.config` restore otomatik çalışır.
 
 ---
 
@@ -206,11 +208,11 @@ msbuild CodeLensAI\CodeLensAI.csproj /p:Configuration=Release /v:minimal
 
 | Versiyon | Değişiklik |
 |---|---|
-| v1.6.0 | Sohbet baloncuğu UI redesign — konuşma geçmişi, kod önizleme, model pill |
-| v1.5.0 | Yeni logo tasarımı |
-| v1.4.0 | CI/CD pipeline stabil, VSIX artifact otomatik release |
-| v1.2.0 | VSIX build düzeltildi (non-SDK csproj, VS 2022 Pro/Ent/Com) |
-| v1.1.0 | Constructor injection, WPF compat, unit test altyapısı |
+| v1.7.0 | Model dropdown, Enter ile gönder, temiz hata mesajları, kod önizleme satır sayısı |
+| v1.6.0 | Sohbet baloncuğu UI — konuşma geçmişi, kod önizleme, model pill |
+| v1.5.0 | Yeni logo |
+| v1.4.0 | CI/CD pipeline stabil, otomatik VSIX release |
+| v1.2.0 | VSIX build düzeltildi (non-SDK csproj) |
 | v1.0.0 | İlk sürüm |
 
 ---
@@ -219,8 +221,7 @@ msbuild CodeLensAI\CodeLensAI.csproj /p:Configuration=Release /v:minimal
 
 1. Fork'layın
 2. Feature branch oluşturun (`git checkout -b feature/yeni-ozellik`)
-3. Commit'leyin
-4. PR açın
+3. Commit'leyin ve PR açın
 
 ---
 
